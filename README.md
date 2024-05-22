@@ -8,6 +8,7 @@
 # in daps folder
 
 conda create -n daps python=3.8
+conda activate daps
 
 pip install -r requirements.txt
 pip install torch torchvision torchaudio
@@ -54,9 +55,9 @@ Now you are ready for run. For **phase retrieval** with DAPS-1k in 4 runs for $1
 python posterior_sample.py +data=demo +model=ffhq256ddpm +task=phase_retrieval save_dir=results num_runs=4 task.likelihood_estimator_config.ode_step=5 sampler.num_steps=200 batch_size=10 +sampler=edm_daps data.start_id=0 data.end_id=10 name=phase_retrieval_demo +seed=42 gpu=0
 ```
 
-It taks about $8$ minutes ($2$ for each run) on a single NVIDIA A100-SXM4-80GB GPU.
+It taks about $8$ minutes ($2$ for each run) on a single NVIDIA A100-SXM4-80GB GPU. The results are saved at foloder `\results/phase_retrieval_demo`. You might find figure like below in `grid_results.png`:
 
-
+![image-20240522081725814](README.assets/demo.png)
 
 For other task, 
 
@@ -69,4 +70,10 @@ replace the {TASK_NAME} by one of following:
 ```
 down_sampling, inpainting, inpainting_rand, gaussian_blur, motion_blur, nonlinear_blur, hdr, phase_retrieval
 ```
+
+
+
+
+
+
 

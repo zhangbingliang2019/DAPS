@@ -23,14 +23,20 @@ def load_yaml(file_path: str) -> dict:
         config = yaml.load(f, Loader=yaml.FullLoader)
     return config
 
+def norm_01(y):
+    tmp = (y - y.mean()) / y.std()
+    tmp = tmp.clip(-0.5, 0.5) * 3
+    return tmp
 
-def resize(y, x):
+def resize(y, x, task_name):
     """[B, C, H, W]"""
     if y.shape != x.shape:
-        return interpolate(y, size=x.shape[-2:], mode='bilinear', align_corners=False)
+        ry = interpolate(y, size=x.shape[-2:], mode='bilinear', align_corners=False)
     else:
-        return y
-
+        ry = y
+    if task_name == 'phase_retrieval':
+        ry = norm_01(ry) * 2 - 1
+    return ry
 
 # def norm(y):
 #     return (y - y.max(dim=0, keepdims=True)[0]) / (y.max(dim=0, keepdims=True)[0] - y.min(dim=0, keepdims=True)[0])
@@ -59,7 +65,7 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
     with open(str(root / 'config.yaml'), 'w') as file:
         yaml.safe_dump(OmegaConf.to_container(args, resolve=True), file, default_flow_style=False, allow_unicode=True)
 
-    stack = torch.cat([images, resize(y, images), full_samples])
+    stack = torch.cat([images, resize(y, images, args.task.operator.name), full_samples])
     save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=args.batch_size)
 
     if args.save_samples:
