@@ -1,0 +1,19 @@
+operator:
+  name: blackhole_imaging
+  root: 'dataset/blackhole'
+  imsize: 64
+  w1: 0 # vis_amp
+  w2: 1
+  w3: 1
+  w4: 0.5
+  sigma: 0
+
+
+likelihood_estimator_config:
+  name: 'langevin_blackhole'
+  step: 300
+  lr: 1e-4
+  ode_step: 10
+  tau: 1
+
+

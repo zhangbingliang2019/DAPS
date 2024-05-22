@@ -1,0 +1,11 @@
+likelihood_estimator_config:
+  name: 'langevin'
+  step: 100
+  lr: 5e-5
+  ode_step: 10
+  tau: 0.01
+
+operator:
+  name: phase_retrieval
+  oversample: 2.0
+  sigma: 0.05

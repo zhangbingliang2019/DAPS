@@ -1,0 +1,3 @@
+name: blackhole
+shape: [1, 64, 64]
+root: 'dataset/blackhole'

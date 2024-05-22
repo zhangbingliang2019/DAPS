@@ -1,0 +1,12 @@
+likelihood_estimator_config:
+  name: 'langevin'
+  step: 500
+  lr: 1e-6
+  ode_step: 10
+  tau: 0.003
+
+operator:
+  name: down_sampling
+  resolution: 256
+  scale_factor: 16
+  sigma: 0.05

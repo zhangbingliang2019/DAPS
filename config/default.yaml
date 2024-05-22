@@ -1,0 +1,15 @@
+gpu: 0
+batch_size: 20
+num_runs: 4
+save_dir: ./output
+name: debug
+wandb: False
+sub_batch_size: 100
+save_traj: False
+save_samples: False
+show_eval: False
+
+#data: ffhq
+#model: ffhq256ddpm
+#sampler: edm_resample
+#task: down_sampling
