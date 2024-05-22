@@ -58,7 +58,7 @@ typings/
 .env.test
 
 # Mac system files
-.DS_Store
+#.DS_Store
 
 # Windows system files
 Thumbs.db
