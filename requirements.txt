@@ -19,3 +19,7 @@ tqdm==4.64.1
 typing-extensions
 urllib3==1.26.12
 prettytable
+piq
+wandb
+omegaconf
+hydra-core
