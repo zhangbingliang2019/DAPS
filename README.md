@@ -57,7 +57,7 @@ python posterior_sample.py \
 +task=phase_retrieval \
 +sampler=edm_daps \
 save_dir=results \
-num_runs=1 \
+num_runs=4 \
 task.likelihood_estimator_config.ode_step=5 \
 sampler.num_steps=200 batch_size=10 \
 data.start_id=0 data.end_id=10 \
@@ -70,9 +70,17 @@ It takes about $8$ minutes ($2$ for each run) and $6G$ GPU memory on a single NV
 
 And evalution results in `eval.md`:
 
-|
-
-
+| meas_error | psnr  | ssim | lpips |
+| ---------- | ----- | ---- | ----- |
+| 1113.66    | 32.01 | 0.89 | 0.10  |
+| 1108.65    | 31.17 | 0.86 | 0.09  |
+| 1106.93    | 32.24 | 0.88 | 0.13  |
+| 1110.67    | 32.57 | 0.90 | 0.09  |
+| 1129.75    | 29.30 | 0.85 | 0.13  |
+| 1110.73    | 32.23 | 0.88 | 0.14  |
+| 1112.70    | 32.12 | 0.89 | 0.12  |
+| 1117.71    | 10.32 | 0.17 | 0.68  |
+| 1107.64    | 31.64 | 0.87 | 0.11  |
 
 
 

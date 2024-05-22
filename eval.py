@@ -7,7 +7,7 @@ import numpy as np
 
 
 class Metrics(nn.Module):
-    def __init__(self, x0, op, y, eval_fn=('meas_error', 'psnr', 'ssim', 'lpips', 'lpips_max')):
+    def __init__(self, x0, op, y, eval_fn=('meas_error', 'psnr', 'ssim', 'lpips')):
         super().__init__()
         '''x0, y:[B, C, H, W]'''
         self.x0 = x0[None]
@@ -16,7 +16,7 @@ class Metrics(nn.Module):
         self.eval_fn = {}
         self.cmp_fn = {}
         if 'meas_error' in eval_fn:
-            self.eval_fn['meas_error'] = self.op.error
+            self.eval_fn['meas_error'] = lambda x, y: self.op.error(x, y)**(1/2)
             self.cmp_fn['meas_error'] = 'min'
         if 'psnr' in eval_fn:
             self.eval_fn['psnr'] = lambda x1, x2: psnr(x1, x2, data_range=1.0, reduction='none')
