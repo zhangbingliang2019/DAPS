@@ -1,0 +1,6 @@
+latent: False
+num_steps: 200
+solver: 'daps'
+sigma_max: 100
+sigma_min: 0.1
+sigma_final: 0

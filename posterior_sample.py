@@ -24,18 +24,6 @@ def load_yaml(file_path: str) -> dict:
     return config
 
 
-def get_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--task_config', default='config/task/down_sampling.yaml', type=str)
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--save_dir', type=str, default='./output')
-    parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--num_runs', type=int, default=1)
-    parser.add_argument('--name', type=str, default='debug')
-    args = parser.parse_args()
-    return args
-
-
 def resize(y, x):
     """[B, C, H, W]"""
     if y.shape != x.shape:
@@ -114,7 +102,7 @@ def main(args):
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     setproctitle.setproctitle(args.name)
-    # args = get_parser()
+
     print(args)
     torch.cuda.set_device('cuda:{}'.format(args.gpu))
 
@@ -129,16 +117,6 @@ def main(args):
     # get sampler
     sampler = get_sampler(**args.sampler, likelihood_estimator_config=args.task.likelihood_estimator_config)
 
-    ''' for debug only:'''
-    if args.show_eval:
-        name = str(args.task.likelihood_estimator_config.name)
-        if name == 'double_langevin':
-            sampler.likelihood_estimator.lgv1.gt = sampler.likelihood_estimator.lgv2.gt = images
-        else:
-            sampler.likelihood_estimator.gt = images
-
-    ''''''
-
     # get model
     model = get_model(**args.model)
 
@@ -148,7 +126,6 @@ def main(args):
     sde_trajs = []
     for _ in range(args.num_runs):
         x_start = sampler.get_start(images)
-        # samples = sampler.sample(model, x_start, operator, y, SDE=True, verbose=True, record=True)
         samples = sample_in_sub_batch(sampler, model, x_start, operator, y, SDE=True, verbose=True, record=True,
                                       sub_batch_size=args.sub_batch_size)
         sampler.sde_traj.compile()
@@ -161,7 +138,6 @@ def main(args):
     results = metrics.eval(full_samples)
     markdown_text = metrics.display(results)
 
-    print('For Markdown:')
     print(markdown_text)
 
     # log results

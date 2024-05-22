@@ -16,4 +16,4 @@ model_config:
   resblock_updown: True
   use_fp16: False
   use_new_attention_order: False
-  model_path: checkpoint/ffhq_10m.pt
+  model_path: checkpoint/ffhq256.pt

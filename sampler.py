@@ -51,6 +51,7 @@ class DiffusionSampler(nn.Module):
 
         # for safety issue
         self.factor_steps = [max(f, 2e-4) for f in self.factor_steps]
+
     def get_sigma_fn(self, scheduler):
         if scheduler == 'sqrt':
             sigma_fn = lambda t: np.sqrt(t)
@@ -79,11 +80,13 @@ class DiffusionSampler(nn.Module):
             # print('scheduler: ', timestep)
             tmp = timestep.split('-')[1:]
             p, t_cut, first_sigma_min, second_sigma_max = int(tmp[0]), float(tmp[1]), float(tmp[2]), float(tmp[3])
+
             def get_time_step_fn(r):
                 if r < t_cut:
                     return (sigma_max ** (1 / p) + r / t_cut * (first_sigma_min ** (1 / p) - sigma_max ** (1 / p))) ** p
                 else:
-                    return (second_sigma_max ** (1 / p) + (r - t_cut) / (1 - t_cut) * (sigma_min ** (1 / p) - second_sigma_max ** (1 / p))) ** p
+                    return (second_sigma_max ** (1 / p) + (r - t_cut) / (1 - t_cut) * (
+                                sigma_min ** (1 / p) - second_sigma_max ** (1 / p))) ** p
         else:
             raise NotImplementedError
         return get_time_step_fn
@@ -132,24 +135,24 @@ class DiffusionSampler(nn.Module):
             self.sde_traj.add_image('xt', x)
         return x
 
-    def _resampling(self, model, x_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
+    def _daps(self, model, x_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
         pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
         x = x_start
         for s in pbar:
             if record:
                 self.sde_traj.add_image('xt', x)
             # x0hat = model.tweedie(x, self.sigma_steps[s])
-            x0opt, _ = self.likelihood_estimator.noisy_likelihood_score(model, x, op, y, self.sigma_steps[s],
-                                                                        s, self.num_steps, False)
+            x0y, _ = self.likelihood_estimator.noisy_likelihood_score(model, x, op, y, self.sigma_steps[s],
+                                                                      s, self.num_steps, False)
 
-            x = x0opt + self.sigma_steps[s + 1] * torch.randn_like(x0opt)
+            x = x0y + self.sigma_steps[s + 1] * torch.randn_like(x0y)
 
             if torch.isnan(x).any():
                 return x
 
             if record:
                 # self.sde_traj.add_image('tweedie', x0hat)
-                self.sde_traj.add_image('x0opt', x0opt)
+                self.sde_traj.add_image('x0y', x0y)
                 self.likelihood_estimator.record(self.sde_traj)
 
         if record:
@@ -160,10 +163,8 @@ class DiffusionSampler(nn.Module):
         self.sde_traj = SDETrajectory()
         if self.solver == 'euler':
             return self._euler(model, x_start, op, y, SDE, verbose, record, checkpoint)
-        elif self.solver == 'resampling':
-            return self._resampling(model, x_start, op, y, SDE, verbose, record, checkpoint)
-        # elif self.solver == 'heun':
-        #     return self._heun(model, x_start, op, y, SDE, verbose)
+        elif self.solver == 'daps':
+            return self._daps(model, x_start, op, y, SDE, verbose, record, checkpoint)
         else:
             raise NotImplementedError
 
@@ -181,7 +182,7 @@ class LatentDiffusionSampler(DiffusionSampler):
         self.down_factor = down_factor
         self.channel = channel
 
-    def _resampling(self, model, z_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
+    def _daps(self, model, z_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
         pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
         z = z_start
         for s in pbar:
@@ -189,15 +190,15 @@ class LatentDiffusionSampler(DiffusionSampler):
             if record:
                 self.sde_traj.add_image('zt', z)
             # x0hat = model.tweedie(x, self.sigma_steps[s])
-            z0opt, _ = self.likelihood_estimator.noisy_likelihood_score(model, z, op, y, self.sigma_steps[s], s,
-                                                                        self.num_steps, True)
-            z = z0opt + self.sigma_steps[s + 1] * torch.randn_like(z0opt)
+            z0y, _ = self.likelihood_estimator.noisy_likelihood_score(model, z, op, y, self.sigma_steps[s], s,
+                                                                      self.num_steps, True)
+            z = z0y + self.sigma_steps[s + 1] * torch.randn_like(z0y)
 
             if torch.isnan(z).any():
                 return z
 
             if record:
-                self.sde_traj.add_image('z0opt', z0opt)
+                self.sde_traj.add_image('z0y', z0y)
                 self.likelihood_estimator.record(self.sde_traj)
 
         if record:
@@ -210,8 +211,8 @@ class LatentDiffusionSampler(DiffusionSampler):
         if self.solver == 'euler':
             assert op is None and y is None
             z0 = self._euler(model, z_start, op, y, SDE, verbose, record, checkpoint)
-        elif self.solver == 'resampling':
-            z0 = self._resampling(model, z_start, op, y, SDE, verbose, record, checkpoint)
+        elif self.solver == 'daps':
+            z0 = self._daps(model, z_start, op, y, SDE, verbose, record, checkpoint)
         # elif self.solver == 'heun':
         #     return self._heun(model, x_start, op, y, SDE, verbose)
         else:
@@ -256,150 +257,10 @@ def get_estimator(name: str, **kwargs):
     return __ESTIMATOR__[name](**kwargs)
 
 
-# Noisy likelihood estimator
-
-@register_estimator(name='dps')
-class DPS(LikelihoodEstimator):
-    def __init__(self, weight=1.0):
-        self.weight = weight
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        x_t = x.clone().requires_grad_(True)
-        x0hat = model.tweedie(x_t, sigma)
-        log_likelihood = op.log_likelihood(x0hat, y)
-        score = torch.autograd.grad(log_likelihood, x_t, grad_outputs=torch.ones_like(log_likelihood))[0]
-        return score, self.weight
-
-
-@register_estimator(name='ode_backward')
-class ODEBackward(LikelihoodEstimator):
-    def __init__(self, weight=1.0, checkpoint=False, ode_step=40):
-        self.weight = weight
-        self.x0 = None
-        self.checkpoint = checkpoint
-        self.ode_step = ode_step
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01)
-        x_t = x.clone().requires_grad_(True)
-        x0 = sampler.sample(model, x_t, SDE=False, verbose=False, checkpoint=self.checkpoint)
-        self.x0 = x0
-        log_likelihood = op.log_likelihood(x0, y)
-        # score = torch.autograd.grad(log_likelihood, x_t, grad_outputs=torch.ones_like(log_likelihood), retain_graph=True)[0]
-        log_likelihood.sum().backward()
-        score = x_t.grad
-        return score, self.weight
-
-    def record(self, sde_traj):
-        sde_traj.add_image('x0', self.x0)
-
-
-@register_estimator(name='sde_backward')
-class SDEBackward(LikelihoodEstimator):
-    def __init__(self, N=3, weight=1.0, checkpoint=False, sde_step=40):
-        self.weight = weight
-        self.x0 = None
-        self.checkpoint = checkpoint
-        self.sde_step = sde_step
-        self.N = N
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        sampler = DiffusionSampler(num_steps=self.sde_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01)
-        x_t = x.clone().requires_grad_(True)  # (B, 3, D, D)
-        x_tn = x_t.unsqueeze(dim=1).repeat(1, self.N, 1, 1, 1).view(-1, *x_t.shape[1:])
-        x0 = sampler.sample(model, x_tn, SDE=True, verbose=False, checkpoint=self.checkpoint)
-        self.x0 = x0.view(-1, self.N, *x_t.shape[1:])
-        y_n = y.unsqueeze(dim=1).repeat(1, self.N, 1, 1, 1).view(-1, *y.shape[1:])
-        log_likelihood = op.log_likelihood(x0, y_n).view(-1, self.N).max(1)[0]
-        # score = torch.autograd.grad(log_likelihood, x_t, grad_outputs=torch.ones_like(log_likelihood), retain_graph=True)[0]
-        log_likelihood.sum().backward()
-        score = x_t.grad
-        return score, self.weight
-
-    def record(self, sde_traj):
-        sde_traj.add_image('x0', self.x0)
-
-
-@register_estimator(name='optimization')
-class Optimization(LikelihoodEstimator):
-    def __init__(self, step=100, lr=0.1, weight=1.0, threshold='auto', ode_step=5):
-        self.opt_steps = step
-        self.lr = float(lr)
-        self.threshold = threshold
-        self.weight = weight
-        self.x0hat = None
-        self.ode_step = ode_step
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01, sigma_final=None)
-        self.x0hat = sampler.sample(model, x, SDE=False)
-        x0hat = self.x0hat.clone().detach().requires_grad_(True)
-        # z = torch.zeros_like(x0hat).requires_grad_(True)
-        optimizer = torch.optim.SGD([x0hat], lr=self.lr)
-
-        for step in range(self.opt_steps):
-            loss = op.error(x0hat, y).sum()
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            with torch.no_grad():
-                x0hat.data = x0hat.data.clip(-1, 1)
-                if self.threshold == 'auto':
-                    threshold = sigma
-                else:
-                    threshold = self.threshold
-                x0hat.data = x0hat.data.clip(self.x0hat - threshold, self.x0hat + threshold)
-        return x0hat.detach(), self.weight
-
-    def record(self, sde_traj):
-        sde_traj.add_image('tweedie', self.x0hat)
-
-
-#
-# @register_estimator(name='langevin')
-# class Langevin(LikelihoodEstimator):
-#     def __init__(self, step=1000, lr='auto', ode_step=5, tau=0.05):
-#         self.langevin_step = step
-#         self.lr = lr
-#         self.ode_step = ode_step
-#         self.tau = tau
-#         self.x0 = None
-#
-#     def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-#         if self.lr == 'auto':
-#             lr = sigma ** 2 / 2
-#         else:
-#             lr = float(self.lr)
-#         sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-#                                    sigma_max=sigma, sigma_min=0.02)
-#
-#         self.x0 = sampler.sample(model, x, SDE=False, verbose=False)
-#         x = self.x0.clone().detach().requires_grad_(True)
-#
-#         optimizer = torch.optim.SGD([x], lr=lr)
-#         for _ in range(self.langevin_step):
-#             loss = op.error(x, y).sum() / self.tau ** 2 / 2
-#             loss += ((x - self.x0) ** 2).sum() / sigma ** 2 / 2
-#
-#             optimizer.zero_grad()
-#             loss.backward(retain_graph=True)
-#             optimizer.step()
-#             with torch.no_grad():
-#                 x.data = x.data + np.sqrt(2 * lr) * torch.randn_like(x)
-#                 x.data = x.data.clip(-1, 1)
-#         return x.detach(), None
-#
-#     def record(self, sde_traj):
-#         sde_traj.add_image('tweedie', self.x0)
-#
-#
-
 @register_estimator(name='langevin')
 class Langevin(LikelihoodEstimator):
-    def __init__(self, step=100, lr=0.1, ode_step=10, tau=0.1, lr_scheduler='decay', space='pixel', rescale=1, milestone=1, return_tweedie=True, SDE=False, optimizer='sgd', lr_min_ratio=0.01):
+    def __init__(self, step=100, lr=0.1, ode_step=10, tau=0.1, lr_scheduler='decay', space='pixel', rescale=1,
+                 milestone=1, return_ode=True, SDE=False, optimizer='sgd', lr_min_ratio=0.01):
         self.langevin_step = step
         self.lr = float(lr)
         self.ode_step = ode_step
@@ -408,35 +269,10 @@ class Langevin(LikelihoodEstimator):
         self.space = space
         self.rescale = rescale
         self.milestone = milestone
-        self.return_tweedie = return_tweedie
+        self.return_ode = return_ode
         self.optimizer = optimizer
         self.SDE = SDE
         self.lr_min_ratio = lr_min_ratio
-
-        # self.eval
-        self.psnr_fn = lambda x, x0: psnr(x, x0, 1.0, 'none')
-        self.lpips_fn = LPIPS(True, reduction='none')
-
-    def noisy_likelihood_score_test(self, model, x, op, y, sigma, time_step, totoal_step):
-        sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01)
-        with torch.no_grad():
-            x0 = sampler.sample(model, x, SDE=False, verbose=False)
-        x = x0.clone().detach().requires_grad_(True)
-        self.x0 = x0
-        lr = self.lr * sigma
-
-        for _ in range(self.langevin_step):
-            loss = op.error(x, y).sum() / self.tau ** 2 * 0
-            loss += ((x - x0) ** 2).sum() / (2 * sigma ** 2)
-
-            grad = torch.autograd.grad(loss, x)[0]
-            # print(grad.max(), grad.min(), (grad ** 2).mean())
-            # print(x.max(), x.min())
-            # print()
-            # with torch.no_grad():
-            # x.data = x.data - lr * grad + np.sqrt(2 * lr) * torch.randn_like(x)
-        return x.detach(), None
 
     def noisy_likelihood_score(self, model, x, op, y, sigma, time_step, totoal_step, latent=False):
         if latent:
@@ -451,7 +287,7 @@ class Langevin(LikelihoodEstimator):
         with torch.no_grad():
             x0 = sampler.sample(model, x, SDE=self.SDE, verbose=False)
         self.x0 = x0
-        if time_step != total_step - 1 or not self.return_tweedie:
+        if time_step != total_step - 1 or not self.return_ode:
             x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
         else:
             x = x0
@@ -467,21 +303,21 @@ class Langevin(LikelihoodEstimator):
 
         self.x0 = x0
         self.z0 = z0
-        #print(time_step, totoal_step)
-        if time_step != total_step - 1 or not self.return_tweedie:
+        # print(time_step, totoal_step)
+        if time_step != total_step - 1 or not self.return_ode:
             if self.space == 'auto':
                 # if time_step / totoal_step >= 2 / 3:
                 if sigma <= self.milestone:
-                    z = self.langevin_latent(model, z0, sigma, op, y, time_step/total_step)
+                    z = self.langevin_latent(model, z0, sigma, op, y, time_step / total_step)
                 else:
-                    x = self.langevin_pixel(model, x0, sigma, op, y, time_step/total_step)
+                    x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
                     z = model.encode(x)
             elif self.space == 'pixel':
-                x = self.langevin_pixel(model, x0, sigma, op, y, time_step/total_step)
+                x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
                 self.x0opt = x
                 z = model.encode(x)
             else:
-                z = self.langevin_latent(model, z0, sigma, op, y, time_step/total_step)
+                z = self.langevin_latent(model, z0, sigma, op, y, time_step / total_step)
 
         else:
             z = z0
@@ -492,57 +328,6 @@ class Langevin(LikelihoodEstimator):
             return torch.optim.SGD([x], lr)
         elif self.optimizer == 'adam':
             return torch.optim.Adam([x], lr)
-
-    def eval_pixel(self, x, x0, model, sigma, op, y):
-        if not hasattr(self, 'gt'):
-            return
-        def norm(x):
-            return (x * 0.5 + 0.5).clip(0, 1)
-        with torch.no_grad():
-            print()
-            z0_psnr = self.psnr_fn(norm(self.gt), norm(x0))
-            z0y_psnr = self.psnr_fn(norm(self.gt), norm(x))
-            z0_lpips = self.lpips_fn(norm(self.gt), norm(x0))
-            z0y_lpips = self.lpips_fn(norm(self.gt), norm(x))
-            print('x0: ', x0.min(), x0.max(), x0.std())
-            print('x: ', x.min(), x.max(), x.std())
-            print('dist: ', (x0 - x).abs().min(), (x0 - x).abs().max(), (x0 - x).abs().std())
-            print('x0 psnr: ', z0_psnr)
-            print('x0y psnr: ', z0y_psnr)
-            print('x0 lpips: ', z0_lpips)
-            print('x0y lpips: ', z0y_lpips)
-            print('psnr mean: ', z0y_psnr.mean())
-            print('lpips mean: ', z0y_lpips.mean())
-            print('meas error: ', op.error(x, y).sum())
-            print('sigma: ', sigma)
-            print('lr', self.lr)
-            print()
-
-    def eval_latent(self, z, z0, model, sigma, op, y):
-        if not hasattr(self, 'gt'):
-            return
-        def norm(x):
-            return (x * 0.5 + 0.5).clip(0, 1)
-        with torch.no_grad():
-            print()
-            z0_psnr = self.psnr_fn(norm(self.gt), norm(model.decode(z0)))
-            z0y_psnr = self.psnr_fn(norm(self.gt), norm(model.decode(z)))
-            z0_lpips = self.lpips_fn(norm(self.gt), norm(model.decode(z0)))
-            z0y_lpips = self.lpips_fn(norm(self.gt), norm(model.decode(z)))
-            print('z0: ', z0.min(), z0.max(), z0.std())
-            print('z: ', z.min(), z.max(), z.std())
-            print('dist: ', (z0-z).abs().min(), (z0-z).abs().max(), (z0-z).abs().std())
-            print('z0 psnr: ', z0_psnr)
-            print('z0y psnr: ', z0y_psnr)
-            print('z0 lpips: ', z0_lpips)
-            print('z0y lpips: ', z0y_lpips)
-            print('psnr mean: ', z0y_psnr.mean())
-            print('lpips mean: ', z0y_lpips.mean())
-            print('meas error: ', op.error(model.decode(z), y).sum())
-            print('sigma: ', sigma)
-            print('lr', self.lr)
-            print()
-
 
     def get_learning_rate_multiplier(self, r):
         p = 1
@@ -575,8 +360,6 @@ class Langevin(LikelihoodEstimator):
 
             if torch.isnan(x).any():
                 return x.detach()
-        x.data = x.data.clip(-3, 3)
-        self.eval_pixel(x, x0, model, sigma, op, y)
         return x.detach()
 
     def langevin_latent(self, model, z0, sigma, op, y, ratio):
@@ -606,8 +389,6 @@ class Langevin(LikelihoodEstimator):
 
             if torch.isnan(z).any():
                 return z.detach()
-        z.data = z.data.clip(-10, 10)
-        self.eval_latent(z, z0, model, sigma, op, y)
         return z.detach()
 
     def record(self, sde_traj):
@@ -616,6 +397,7 @@ class Langevin(LikelihoodEstimator):
             sde_traj.add_image('z0', self.z0)
         if hasattr(self, 'x0opt'):
             sde_traj.add_image('x0opt', self.x0opt)
+
 
 @register_estimator(name='double_langevin')
 class DoubleEstimator(LikelihoodEstimator):
@@ -642,117 +424,6 @@ class DoubleEstimator(LikelihoodEstimator):
         else:
             # print('record: ', self.ptr)
             self.lgv2.record(sde_traj)
-
-
-
-# @register_estimator(name='langevin_blackhole')
-# class LangevinBlackHole(LikelihoodEstimator):
-#     def __init__(self, step=100, lr=0.1, ode_step=10, tau=0.1, lr_scheduler='none', space='pixel'):
-#         self.langevin_step = step
-#         self.lr = float(lr)
-#         self.ode_step = ode_step
-#         self.tau = float(tau)
-#         self.lr_scheduler = lr_scheduler
-#         self.space = space
-#
-#     def noisy_likelihood_score(self, model, x, op, y, sigma, time_step, totoal_step, latent=False):
-#         if latent:
-#             raise NotImplementedError
-#         else:
-#             return self.pixel_score(model, x, op, y, sigma, time_step, totoal_step)
-#
-#     def pixel_score(self, model, x, op, y, sigma, time_step, totoal_step):
-#         sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-#                                    sigma_max=sigma, sigma_min=0.01)
-#         with torch.no_grad():
-#             x0 = sampler.sample(model, x, SDE=False, verbose=False)
-#         self.x0 = x0
-#         if time_step != totoal_step - 1:
-#             x = self.langevin_pixel(model, x0, sigma, op, y, time_step/totoal_step)
-#         else:
-#             x = x0
-#         return x, None
-#
-#     def langevin_pixel(self, model, x0, sigma, op, y, ratio):
-#         x = x0.clone().detach()
-#         if self.lr_scheduler == 'sigma':
-#             lr = self.lr * sigma
-#         else:
-#             # print('Here')
-#             lr = self.lr * (1 - ratio)
-#
-#         for _ in range(self.langevin_step):
-#             with torch.no_grad():
-#                 grad = op.grad(x) / self.tau ** 2 + (x - x0) / sigma**2
-#                 x -= lr * grad
-#                 x += + np.sqrt(2 * lr) * torch.randn_like(x)
-#
-#             if torch.isnan(x).any():
-#                 return x.detach()
-#         return x.detach()
-#
-#     def record(self, sde_traj):
-#         sde_traj.add_image('tweedie', self.x0)
-
-
-@register_estimator(name='finetuning')
-class Finetuning(LikelihoodEstimator):
-    def __init__(self, opt_steps=10, opt_lr=1e-4, weight=1.0, threshold=0.05, ode_step=5):
-        self.opt_steps = opt_steps
-        self.lr = opt_lr
-        self.threshold = threshold
-        self.weight = weight
-        self.x0hat = None
-        self.ode_step = ode_step
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        model.requires_grad_(True)
-        model.train()
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
-        sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01, sigma_final=None)
-
-        for step in range(self.opt_steps + 1):
-            self.x0hat = sampler.sample(model, x, SDE=False)
-            x0hat = self.x0hat
-            if step != self.opt_steps:
-                loss = op.error(x0hat, y).sum()
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-        return self.x0hat.detach(), self.weight
-
-    def record(self, sde_traj):
-        sde_traj.add_image('tweedie', self.x0hat)
-
-
-@register_estimator(name='sde_tree_backward')
-class SDETreeBackward(LikelihoodEstimator):
-    def __init__(self, N=3, weight=1.0, checkpoint=False, sde_step=5, rho=0.8):
-        self.weight = weight
-        self.x0 = None
-        self.checkpoint = checkpoint
-        self.sde_step = sde_step
-        self.N = N
-        self.rho = rho
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_ratio):
-        sampler = DiffusionSampler(num_steps=self.sde_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=sigma * self.rho)
-        x_t = x.clone().requires_grad_(True)  # (B, 3, D, D)
-        x_tn = x_t.unsqueeze(dim=1).repeat(1, self.N, 1, 1, 1).view(-1, *x_t.shape[1:])
-        x_t_prime = sampler.sample(model, x_tn, SDE=True, verbose=False, checkpoint=self.checkpoint)
-        x0 = model.tweedie(x_t_prime, sigma * self.rho)
-        self.x0 = x0.view(-1, self.N, *x_t.shape[1:])
-        y_n = y.unsqueeze(dim=1).repeat(1, self.N, 1, 1, 1).view(-1, *y.shape[1:])
-        log_likelihood = op.log_likelihood(x0, y_n).view(-1, self.N).max(1)[0]
-        # score = torch.autograd.grad(log_likelihood, x_t, grad_outputs=torch.ones_like(log_likelihood), retain_graph=True)[0]
-        log_likelihood.sum().backward()
-        score = x_t.grad
-        return score, self.weight
-
-    def record(self, sde_traj):
-        sde_traj.add_image('x0', self.x0)
 
 
 class SDETrajectory(nn.Module):

@@ -311,8 +311,3 @@ class HighDynamicRange(Operator):
     def __call__(self, data):
         return torch.clip((data * self.scale), -1, 1)
 
-
-from .blackhole import BlackHoleImaging
-
-
-

@@ -161,35 +161,6 @@ class CelebA(DiffusionData):
         data = torch.stack([self.load_data(i) for i in range(size)], dim=0)
         return data + torch.randn_like(data) * sigma
 
-
-@register_dataset('blackhole')
-class BlackHole(DiffusionData):
-    def __init__(self, shape=(1, 64, 64), root='dataset/blackhole', device='cuda'):
-        import ehtim as eh
-        self.shape = shape
-        self.device = device
-        gtfile = root + '/gt.fits'
-        blurfile = root + '/gt_blurred.fits'
-        im = eh.image.load_fits(gtfile)
-        im_blur = eh.image.load_fits(blurfile)
-        im = im.regrid_image(im.fovx(), 64)
-        im_blur = im_blur.regrid_image(im.fovx(), 64)
-        self.gt = torch.from_numpy(im.ivec.reshape(1, 64, 64).astype(np.float32))
-        self.blur = torch.from_numpy(im_blur.ivec.reshape(1, 64, 64).astype(np.float32))
-        self.gt /= self.gt.max()
-        self.blur /= self.blur.max()
-
-    def load_data(self, i):
-        return self.gt.cuda()
-
-    def get_shape(self):
-        return self.shape
-
-    def get_data(self, size=16, sigma=0):
-        data = torch.stack([self.load_data(i) for i in range(size)], dim=0)
-        return data + torch.randn_like(data) * sigma
-
-
 @register_dataset('empty')
 class Empty(DiffusionData):
     def __init__(self, shape, device='cuda'):
