@@ -100,7 +100,7 @@ __pycache__/
 .vscode/
 
 # JetBrains IDEs
-#.idea/
+.idea/
 *.iml
 
 # NetBeans
