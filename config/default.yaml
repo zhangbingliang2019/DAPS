@@ -8,8 +8,3 @@ sub_batch_size: 10
 save_traj: False
 save_samples: True
 show_eval: False
-
-#data: ffhq
-#model: ffhq256ddpm
-#sampler: edm_resample
-#task: down_sampling

@@ -22,5 +22,5 @@ likelihood_estimator_config:
 
 operator:
   name: nonlinear_blur
-  opt_yml_path: /home/bingliang/edm/bkse/options/generate_blur/default.yml
+  opt_yml_path: forward_operator/bkse/options/generate_blur/default.yml
   sigma: 0.05

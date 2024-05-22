@@ -331,38 +331,3 @@ class ImageNet256DDPM(DiffusionModel):
         model_output, model_var_values = torch.split(model_output, x.shape[1], dim=1)
         # print(x.abs().max(), model_output.abs().max())
         return x - sigma * model_output.detach()
-
-@register_model(name='blackhole64ddpm')
-class BlackHole64DDPM(DiffusionModel):
-    def __init__(self, model_config, schedule='linear', device='cuda'):
-        super().__init__()
-        self.net = create_model(**model_config).to(device)
-        self.net.eval()
-        self.device = device
-        # betas = np.array(betas, dtype=np.float64)
-        self.betas = get_named_beta_schedule(schedule, 1000)
-        alphas = 1.0 - self.betas
-        self.alphas_cumprod = np.cumprod(alphas, axis=0)
-        self.u = torch.tensor(np.sqrt((1 - self.alphas_cumprod) / self.alphas_cumprod), device=self.device)
-        # print(self.u)
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def inverse_schedule(self, sigma):
-        z = np.log(sigma ** 2 + 1)
-        beta_d = 19.9
-        beta_min = 0.1
-        t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-        return t
-
-    def tweedie(self, x, sigma=2e-3):
-        t = torch.tensor(int(self.inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(x.shape[0])
-        # print(torch.argmin((self.u-sigma).abs()), t)
-        model_output = self.net(x / math.sqrt(sigma ** 2 + 1), t)
-        # model_mean, pred_xstart = self.mean_processor.get_mean_and_xstart(x, t, model_output)
-        model_output, model_var_values = torch.split(model_output, x.shape[1], dim=1)
-        # print(x.abs().max(), model_output.abs().max())
-        out = x - sigma * model_output.detach()
-        return out

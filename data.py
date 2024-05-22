@@ -43,7 +43,6 @@ class FFHQ(DiffusionData):
     def __init__(self, root='dataset/ffhq256', resolution=256, device='cuda', start_id=None, end_id=None):
         self.data = sorted(list(Path(root).glob('*.png')))
         self.data = self.data[start_id: end_id]
-        # self.data = ["/home/bingliang/data/ffhq256/{:05d}.png".format(i) for i in range(70000)]
         self.trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize(resolution)
