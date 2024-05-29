@@ -117,3 +117,13 @@ replace the {TASK_NAME} by one of following:
 
 * `nonlinear_blur`: nonlinear deblur of default setting in bkse repo
 * `hdr`: high dynamic range reconstruction of factor $2$ 
+
+
+
+## Reference
+
+
+
+
+
+## Acknowledgements
