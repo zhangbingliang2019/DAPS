@@ -1,5 +1,17 @@
 # Decoupled Annealing Posterior Sampling
 
+#### [website](https:) |  [paper](https:)
+
+(PLACE HOLDER: gifs for method flow and visualization of trajectories)
+
+
+
+## Results
+
+(PLACE HOLDER: select and put some results)
+
+
+
 ## Getting started
 
 #### 1. Prepare the Conda environment
@@ -46,7 +58,7 @@ You can add any FFHQ256 images you like to `dataset/demo` folder
 
 
 
-## Inference
+#### 4. Sample
 
 Make a folder to save results:
 
@@ -54,9 +66,7 @@ Make a folder to save results:
 mkdir results
 ```
 
-
-
-### Phase Retrieval
+##### Phase Retrieval
 
 Now you are ready for run. For **phase retrieval** with DAPS-1k in 4 runs for $10$ demo images in `dataset/demo`:
 
@@ -74,28 +84,11 @@ data.start_id=0 data.end_id=10 \
 name=phase_retrieval_demo gpu=0
 ```
 
-It takes about $8$ minutes ($2$ for each run) and $6G$ GPU memory on a single NVIDIA A100-SXM4-80GB GPU. The results are saved at foloder `\results/phase_retrieval_demo`. You might find figure like below in `grid_results.png`:
-
-![image-20240522081725814](README.assets/demo.png)
-
-And evalution results in `eval.md`:
-
-| meas_error |  psnr | ssim | lpips |
-|------------|-------|------|-------|
-|   33.37    | 32.01 | 0.89 |  0.10 |
-|   33.30    | 31.17 | 0.86 |  0.09 |
-|   33.27    | 32.24 | 0.88 |  0.13 |
-|   33.33    | 32.57 | 0.90 |  0.09 |
-|   33.61    | 29.30 | 0.85 |  0.13 |
-|   33.33    | 32.23 | 0.88 |  0.14 |
-|   33.36    | 32.12 | 0.89 |  0.12 |
-|   33.43    | 10.32 | 0.17 |  0.68 |
-|   33.28    | 31.64 | 0.87 |  0.11 |
-|   33.29    | 32.24 | 0.91 |  0.10 |
+It takes about $8$ minutes ($2$ for each run) and $6G$ GPU memory on a single NVIDIA A100-SXM4-80GB GPU. The results are saved at foloder `\results`. 
 
 
 
-### All Tasks
+##### All Tasks
 
 ```
 python posterior_sample.py \
