@@ -115,7 +115,7 @@ replace the {TASK_NAME} by one of following:
 
 * `phase_retrieval`: phase retrival of oversample ratio of $2.0$
 
-* `down_sampling`: super resolution (x$4$)
+* `down_sampling`: super resolution ($\times 4$)
 * `inpainting`:  128x128 box inpainting
 * `inpainting_rand`: $70\%$ random inpainting 
 
