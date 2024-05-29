@@ -79,9 +79,11 @@ python posterior_sample.py \
 save_dir=results \
 num_runs=4 \
 task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 batch_size=10 \
+sampler.num_steps=200 \
+batch_size=10 \
 data.start_id=0 data.end_id=10 \
-name=phase_retrieval_demo gpu=0
+name=phase_retrieval_demo \
+gpu=0
 ```
 
 It takes about $8$ minutes ($2$ for each run) and $6G$ GPU memory on a single NVIDIA A100-SXM4-80GB GPU. The results are saved at foloder `\results`. 
@@ -99,9 +101,11 @@ python posterior_sample.py \
 save_dir=results \
 num_runs=1 \
 task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 batch_size=10 \
+sampler.num_steps=200 \
+batch_size=10 \
 data.start_id=0 data.end_id=10 \
-name={TASK_NAME}_demo gpu=0
+name={TASK_NAME}_demo \
+gpu=0
 ```
 
 replace the {TASK_NAME} by one of following:
