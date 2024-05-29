@@ -13,7 +13,7 @@ conda activate daps
 pip install -r requirements.txt
 ```
 
-We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required here**.
+We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
 
 
@@ -30,7 +30,17 @@ mv {DOWNLOAD_DIR}/ffqh_10m.pt checkpoint/ffhq256.pt
 
 
 
-#### 3. Prepare the dataset (or use provided examples) (optional)
+**(Optional)** For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
+
+```
+# in daps folder
+
+mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
+```
+
+
+
+#### 3.  (Optional) Prepare the dataset (or use provided examples)
 
 You can add any FFHQ256 images you like to `dataset/demo` folder
 
@@ -70,17 +80,18 @@ It takes about $8$ minutes ($2$ for each run) and $6G$ GPU memory on a single NV
 
 And evalution results in `eval.md`:
 
-| meas_error | psnr  | ssim | lpips |
-| ---------- | ----- | ---- | ----- |
-| 1113.66    | 32.01 | 0.89 | 0.10  |
-| 1108.65    | 31.17 | 0.86 | 0.09  |
-| 1106.93    | 32.24 | 0.88 | 0.13  |
-| 1110.67    | 32.57 | 0.90 | 0.09  |
-| 1129.75    | 29.30 | 0.85 | 0.13  |
-| 1110.73    | 32.23 | 0.88 | 0.14  |
-| 1112.70    | 32.12 | 0.89 | 0.12  |
-| 1117.71    | 10.32 | 0.17 | 0.68  |
-| 1107.64    | 31.64 | 0.87 | 0.11  |
+| meas_error |  psnr | ssim | lpips |
+|------------|-------|------|-------|
+|   33.37    | 32.01 | 0.89 |  0.10 |
+|   33.30    | 31.17 | 0.86 |  0.09 |
+|   33.27    | 32.24 | 0.88 |  0.13 |
+|   33.33    | 32.57 | 0.90 |  0.09 |
+|   33.61    | 29.30 | 0.85 |  0.13 |
+|   33.33    | 32.23 | 0.88 |  0.14 |
+|   33.36    | 32.12 | 0.89 |  0.12 |
+|   33.43    | 10.32 | 0.17 |  0.68 |
+|   33.28    | 31.64 | 0.87 |  0.11 |
+|   33.29    | 32.24 | 0.91 |  0.10 |
 
 
 
