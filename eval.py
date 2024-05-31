@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import wandb
 import numpy as np
+from abc import ABC, abstractmethod
 
 
 class Metrics(nn.Module):
@@ -150,3 +151,59 @@ class Table(object):
     def get_latex_string(self):
         # TODO: to be done in future
         pass
+
+
+
+__EVAL_FN__ = {}
+
+
+def register_eval_fn(name: str):
+    def wrapper(cls):
+        if __EVAL_FN__.get(name, None):
+            raise NameError(f"Name {name} is already registered!")
+        __EVAL_FN__[name] = cls
+        return cls
+
+    return wrapper
+
+
+def get_eval_fn(name: str, **kwargs):
+    if __EVAL_FN__.get(name, None) is None:
+        raise NameError(f"Name {name} is not defined.")
+    return __EVAL_FN__[name](**kwargs)
+
+
+class EvalFn(torch.nn.Module):
+    def __init__(self, gt, measurement):
+        super().__init__()
+        self.gt = gt
+        self.measurement = measurement
+
+    def norm(self, x):
+        return (x * 0.5 + 0.5).clip(0, 1)
+
+    def forward(self, sample):
+        return self.evaluate(self.gt, self.measurement, sample)
+
+    def evaluate(self, gt, measurement, sample):
+        pass
+
+@register_eval_fn('psnr')
+class PeakSignalNoiseRatio(EvalFn):
+    def evaluate(self, gt, measurement, sample):
+        return psnr(self.norm(gt), self.norm(sample), 1.0, reduction='none')
+
+
+@register_eval_fn('ssim')
+class StructuralSimilarityIndexMeasure(EvalFn):
+    def evaluate(self, gt, measurement, sample):
+        return ssim(self.norm(gt), self.norm(sample), 1.0, reduction='none')
+
+@register_eval_fn('lpips')
+class LearnedPerceptualImagePatchSimilarity(EvalFn):
+    def __init__(self, gt, measurement):
+        super().__init__(gt, measurement)
+        self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
+    def evaluate(self, gt, measurement, sample):
+        return self.lpips_fn(self.norm(gt), self.norm(sample))
+

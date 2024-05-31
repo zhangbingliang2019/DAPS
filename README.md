@@ -4,6 +4,14 @@
 
 (PLACE HOLDER: gifs for method flow and visualization of trajectories)
 
+<div>
+  <center>
+  <img src="README.assets/output.gif" alt="output" style="zoom:100%;" />
+  </center>
+</div>
+
+The trajectory of (left) $x_{0\mid y}$, (middle) $\hat x_0(x_t)$ and (right) $x_t$
+
 
 
 ## Results
