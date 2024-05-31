@@ -6,8 +6,8 @@
 
 <div>
   <center>
-  <img src="README.assets/traj.gif" alt="output" style="width:100%;" />
-    <img src="README.assets/traj-cap.png" alt="image-20240530181408971" style="width:75%;" />
+  <img src="README.assets/traj.gif" style="width:100%;" />
+    <img src="README.assets/traj-cap.png" style="width:75%;" />
    </center>
 </div>
 
