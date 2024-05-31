@@ -4,10 +4,10 @@
 
 (PLACE HOLDER: gifs for method flow and visualization of trajectories)
 
-<div style="text-align: center;">
+<p align="center">
   <img src="README.assets/traj.gif" style="width:100%;" />
     <img src="README.assets/traj-cap.png" style="width:75%; text-align: center;" />
-</div>
+</p>
 
 
 ## Results
