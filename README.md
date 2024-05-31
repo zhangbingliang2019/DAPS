@@ -6,7 +6,7 @@
 
 <div style="text-align: center;">
   <img src="README.assets/traj.gif" style="width:100%;" />
-    <img src="README.assets/traj-cap.png" style="width:75%;" />
+    <img src="README.assets/traj-cap.png" style="width:75%; text-align: center;" />
 </div>
 
 
