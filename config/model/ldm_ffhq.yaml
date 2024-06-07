@@ -1,4 +1,4 @@
-name: ldm_ffhq
+name: ldm_ddpm
 ldm_config: 'config/model/_ldm_ffhq.yaml'
 diffusion_path: 'checkpoint/ldm_ffhq.pt'
 

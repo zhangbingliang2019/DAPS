@@ -1,0 +1,13 @@
+- +data=ffhq
+- +model=ldm_ffhq
+- +task=phase_retrieval
+- +sampler=latent_edm_daps
+- save_dir=results
+- num_runs=4
+- task.likelihood_estimator_config.ode_step=5
+- sampler.num_steps=200
+- batch_size=10
+- data.start_id=0
+- data.end_id=10
+- name=phase_retrieval_demo
+- gpu=0

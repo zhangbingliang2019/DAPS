@@ -1,0 +1,55 @@
+gpu: 0
+batch_size: 10
+num_runs: 4
+save_dir: results
+name: phase_retrieval_demo
+wandb: false
+sub_batch_size: 10
+save_traj: false
+save_samples: true
+show_eval: false
+seed: 42
+data:
+  name: ffhq
+  root: dataset/demo
+  resolution: 256
+  start_id: 0
+  end_id: 10
+model:
+  name: ddpm
+  model_config:
+    image_size: 256
+    num_channels: 128
+    num_res_blocks: 1
+    channel_mult: ''
+    learn_sigma: true
+    class_cond: false
+    use_checkpoint: false
+    attention_resolutions: 16
+    num_heads: 4
+    num_head_channels: 64
+    num_heads_upsample: -1
+    use_scale_shift_norm: true
+    dropout: 0.0
+    resblock_updown: true
+    use_fp16: false
+    use_new_attention_order: false
+    model_path: checkpoint/ffhq256.pt
+task:
+  likelihood_estimator_config:
+    name: langevin
+    step: 100
+    lr: 5.0e-05
+    ode_step: 5
+    tau: 0.01
+  operator:
+    name: phase_retrieval
+    oversample: 2.0
+    sigma: 0.05
+sampler:
+  latent: false
+  num_steps: 200
+  solver: daps
+  sigma_max: 100
+  sigma_min: 0.1
+  sigma_final: 0

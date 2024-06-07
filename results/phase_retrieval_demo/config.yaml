@@ -1,0 +1,53 @@
+batch_size: 4
+data:
+  end_id: 4
+  name: ffhq
+  resolution: 256
+  root: dataset/demo
+  start_id: 0
+gpu: 0
+model:
+  diffusion_path: checkpoint/ldm_ffhq.pt
+  ldm_config: config/model/_ldm_ffhq.yaml
+  name: ldm_ffhq
+name: phase_retrieval_demo
+num_runs: 1
+sampler:
+  latent: true
+  num_steps: 200
+  sigma_final: 0
+  sigma_max: 10
+  sigma_min: 0.1
+  solver: daps
+  timestep: double_poly-7-0.8-1-3
+save_dir: results
+save_samples: true
+save_traj: false
+seed: 42
+show_eval: false
+sub_batch_size: 10
+task:
+  likelihood_estimator_config:
+    config1:
+      lr: 2.0e-05
+      lr_scheduler: sigma
+      name: langevin
+      ode_step: 3
+      space: pixel
+      step: 500
+      tau: 0.01
+    config2:
+      lr: 4.0e-06
+      lr_scheduler: none
+      name: langevin
+      ode_step: 3
+      space: latent
+      step: 100
+      tau: 0.01
+    name: double_langevin
+    t_cut: 0.8
+  operator:
+    name: phase_retrieval
+    oversample: 2.0
+    sigma: 0.05
+wandb: false
