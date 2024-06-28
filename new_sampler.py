@@ -278,7 +278,7 @@ class LangevinDynamics(nn.Module):
         return multiplier * self.lr
 
 
-class LatentLangevinDynamics(LangevinDynamics):
+# class LatentLangevinDynamics(LangevinDynamics):
 
 
 class DAPS(nn.Module):
