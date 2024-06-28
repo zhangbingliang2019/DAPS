@@ -1,13 +1,13 @@
 from .edm import dnnlib
 import pickle
 import torch
-import numpy as np
 import torch.nn as nn
-import math
-import yaml
 from .ddpm.unet import create_model
 from omegaconf import OmegaConf
 import importlib
+from abc import abstractmethod
+from .precond import VPPrecond, LDM
+import sys
 
 __MODEL__ = {}
 
@@ -31,90 +31,128 @@ def get_model(name: str, **kwargs):
 
 
 class DiffusionModel(nn.Module):
+    """
+    A class representing a diffusion model.
+    Methods:
+        score(x, sigma): Calculates the score of the diffusion model given the input `x` and standard deviation `sigma`.
+        tweedie(x, sigma): Calculates the Tweedie distribution given the input `x` and standard deviation `sigma`.
+        Must overload either `score` or `tweedie` method.
+    """
+
+    def __init__(self):
+        super(DiffusionModel, self).__init__()
+        # Check if either `score` or `tweedie` is overridden
+        if (self.score.__func__ is DiffusionModel.score and
+            self.tweedie.__func__ is DiffusionModel.tweedie):
+            raise NotImplementedError(
+                "Either `score` or `tweedie` method must be implemented."
+            )
+
     def score(self, x, sigma):
-        pass
+        d = self.tweedie(x, sigma)
+        return (d - x) / sigma ** 2
 
     def tweedie(self, x, sigma):
-        pass
+        return x + self.score(x, sigma) * sigma**2
 
 
 class LatentDiffusionModel(nn.Module):
+    """
+    A class representing a latent diffusion model.
+    Methods:
+        encode(x0): Encodes the input `x0` into latent space.
+        decode(z0): Decodes the latent variable `z0` into the output space.
+        score(z, sigma): Calculates the score of the latent diffusion model given the latent variable `z` and standard deviation `sigma`.
+        tweedie(z, sigma): Calculates the Tweedie distribution given the latent variable `z` and standard deviation `sigma`.
+        Must overload either `score` or `tweedie` method.
+    """ 
+    def __init__(self):
+        super(LatentDiffusionModel, self).__init__()
+        # Check if either `score` or `tweedie` is overridden
+        if (self.score.__func__ is LatentDiffusionModel.score and
+            self.tweedie.__func__ is LatentDiffusionModel.tweedie):
+            raise NotImplementedError(
+                "Either `score` or `tweedie` method must be implemented."
+            )
+    
+    @abstractmethod
     def encode(self, x0):
         pass
 
+    @abstractmethod
     def decode(self, z0):
         pass
 
     def score(self, z, sigma):
-        pass
+        d = self.tweedie(z, sigma)
+        return (d - z) / sigma ** 2
 
     def tweedie(self, z, sigma):
-        pass
+        return z + self.score(z, sigma) * sigma**2
+
+@register_model(name='ddpm')
+class DDPM(DiffusionModel):
+    """
+    DDPM (Diffusion Denoising Probabilistic Model)
+    Attributes:
+        model (VPPrecond): The neural network used for denoising.
+
+    Methods:
+        __init__(self, model_config, device='cuda'): Initializes the DDPM object.
+        tweedie(self, x, sigma=2e-3): Applies the DDPM model to denoise the input, using VP preconditioning from EDM.
+    """
+
+    def __init__(self, model_config, device='cuda'):
+        super().__init__()
+        self.model = VPPrecond(model=create_model(**model_config),learn_sigma=model_config['learn_sigma'],conditional=model_config['class_cond']).to(device)
+        self.model.eval()
+
+    def tweedie(self, x, sigma=2e-3):
+        return self.model(x, torch.as_tensor(sigma).to(x.device))
 
 
-# @register_model(name='sdv1.5')
-# class StableDiffusion(LatentDiffusionModel):
-#     def __init__(self, device='cuda'):
-#         super().__init__()
-#         pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-#         self.tokenizer = pipeline.tokenizer
-#         self.text_encoder = pipeline.text_encoder
-#         self.vae = pipeline.vae
-#         self.scheduler = pipeline.scheduler
-#         self.unet = pipeline.unet
-#         self.device = device
-#         self.prompt_embeds = self._text_features()
-#
-#     def _text_features(self, prompt='an image of human face'):
-#         tokens = self.tokenizer(prompt, return_tensors="pt", padding="max_length", truncation=True, max_length=77).to(
-#             self.device)
-#         with torch.no_grad():
-#             text_embeddings = self.text_encoder(tokens.input_ids)[0]
-#         return text_embeddings
-#
-#     def _inverse_schedule(self, sigma):
-#         z = np.log(sigma ** 2 + 1)
-#         beta_d = 19.9
-#         beta_min = 0.1
-#         t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-#         return t
-#
-#     def _forward(self, z, t):
-#         noise_pred = self.unet(z, t, encoder_hidden_states=self.prompt_embeds, return_dict=False)[0]
-#         return noise_pred
-#
-#     def encode(self, x0, sample=True):
-#         if sample:
-#             return self.vae.encode(x0).latent_dist.sample()
-#         else:
-#             return self.vae.encode(x0).latent_dist.mean
-#
-#     def decode(self, z0):
-#         return self.vae.decode(z0)['sample']
-#
-#     def score(self, z, sigma):
-#         d = self.tweedie(z, sigma)
-#         return (d - z) / sigma ** 2
-#
-#     def tweedie(self, z, sigma):
-#         t = torch.tensor(int(self._inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(z.shape[0])
-#         model_output = self._forward(z / np.sqrt(sigma ** 2 + 1), t)
-#         return z - sigma * model_output.detach()
-#
+@register_model(name='edm')
+class EDM(DiffusionModel):
+    """
+    Diffusion models from EDM (Elucidating the Design Space of Diffusion-Based Generative Models).
+    """
 
-@register_model(name='test_ldm_ffhq')
-class TestLatentDiffusion(LatentDiffusionModel):
+    def __init__(self, model_config, device='cuda'):
+        super().__init__()
+        self.model = self.load_pretrained_model(model_config['model_path'],device=device)
+
+    def load_pretrained_model(self, url, device='cuda'):
+        with dnnlib.util.open_url(url) as f:
+            sys.path.append('model/edm')
+            model = pickle.load(f)['ema'].to(device)
+        return model
+
+    def tweedie(self, x, sigma=2e-3):
+        return self.model(x, torch.as_tensor(sigma).to(x.device))
+
+
+@register_model(name='ldm_ddpm')
+class LatentDDPM(LatentDiffusionModel):
+    """
+    Latent Diffusion Models (High-Resolution Image Synthesis with Latent Diffusion Models).
+    """
+    def __init__(self, ldm_config, diffusion_path, device='cuda'):
+        super().__init__()
+        config = OmegaConf.load(ldm_config)
+        net = LDM(load_model_from_config(config, diffusion_path)).to(device)
+        self.model = VPPrecond(model=net).to(device)
+        self.model.requires_grad_(False)
+
     def encode(self, x0):
-        return torch.randn(x0.shape[0], 4, 64, 64).to(x0.device)
+        return self.model.model.encode(x0)
 
     def decode(self, z0):
-        return torch.randn(z0.shape[0], 3, 256, 256).to(z0.device)
+        return self.model.model.decode(z0)
 
-    def score(self, z, sigma):
-        return torch.randn_like(z).to(z.device)
+    def tweedie(self, x, sigma=2e-3):
+        return self.model(x, torch.as_tensor(sigma).to(x.device))
 
-    def tweedie(self, z, sigma):
-        return torch.randn_like(z).to(z.device)
+
 
 
 def get_obj_from_str(string, reload=False):
@@ -150,184 +188,3 @@ def load_model_from_config(config, ckpt, train=False):
         model.eval()
 
     return model
-
-@register_model(name='ldm_ffhq')
-class LatentDiffusionFFHQ(LatentDiffusionModel):
-    def __init__(self, ldm_config='config/model/_ldm_ffhq.yaml', diffusion_path='checkpoint/ldm_ffhq.pt', device='cuda'):
-        super().__init__()
-        config = OmegaConf.load(ldm_config)
-        self.model = load_model_from_config(config, diffusion_path).to(device)
-        self.device = device
-        self.model.requires_grad_(False)
-
-    def encode(self, x0):
-        return self.model.encode_first_stage(x0)
-
-    def decode(self, z0):
-        # return self.model.decode_first_stage(z0)
-        return self.model.differentiable_decode_first_stage(z0)
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def inverse_schedule(self, sigma):
-        z = np.log(sigma ** 2 + 1)
-        beta_d = 19.9
-        beta_min = 0.1
-        t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-        return t
-
-    def tweedie(self, x, sigma=2e-3):
-        t = torch.tensor(int(self.inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(x.shape[0])
-        # model_output = self.model(x / math.sqrt(sigma ** 2 + 1), t.cpu(), None)
-        model_output = self.model.apply_model(x / math.sqrt(sigma ** 2 + 1), t, None)
-        # model_output = torch.split(model_output, x.shape[1], dim=1)
-        return x - sigma * model_output.detach()
-
-
-@register_model(name='ldm_imagenet')
-class LatentDiffusionImageNet(LatentDiffusionModel):
-    def __init__(self, ldm_config='config/model/_ldm_imagenet.yaml', diffusion_path='checkpoint/ldm_imagenet.pt', device='cuda'):
-        super().__init__()
-        config = OmegaConf.load(ldm_config)
-        self.model = load_model_from_config(config, diffusion_path).to(device)
-        self.device = device
-        self.model.requires_grad_(False)
-
-    def encode(self, x0):
-        return self.model.encode_first_stage(x0)
-
-    def decode(self, z0):
-        # return self.model.decode_first_stage(z0)
-        return self.model.differentiable_decode_first_stage(z0)
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def inverse_schedule(self, sigma):
-        z = np.log(sigma ** 2 + 1)
-        beta_d = 19.9
-        beta_min = 0.1
-        t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-        return t
-
-    def tweedie(self, x, sigma=2e-3):
-        t = torch.tensor(int(self.inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(x.shape[0])
-        # model_output = self.model(x / math.sqrt(sigma ** 2 + 1), t.cpu(), None)
-        model_output = self.model.apply_model(x / math.sqrt(sigma ** 2 + 1), t, None)
-        # model_output = torch.split(model_output, x.shape[1], dim=1)
-        return x - sigma * model_output.detach()
-
-
-@register_model(name='ffhq64')
-class FFHQ64Model(DiffusionModel):
-    def __init__(self, device='cuda'):
-        super().__init__()
-        self.net = self.load_pretrained_model(
-            'https://nvlabs-fi-cdn.nvidia.com/edm/pretrained/edm-ffhq-64x64-uncond-ve.pkl'
-        ).to(device)
-        self.device = device
-
-    def load_pretrained_model(self, url, device='cuda'):
-        with dnnlib.util.open_url(url) as f:
-            net = pickle.load(f)['ema'].to(device)
-        return net
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def tweedie(self, x, sigma=2e-3):
-        return self.net(x, torch.as_tensor(sigma).to(self.device)).clip(-1, 1)
-
-
-def load_yaml(file_path: str) -> dict:
-    with open(file_path) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    return config
-
-
-def get_named_beta_schedule(schedule_name, num_diffusion_timesteps):
-    if schedule_name == "linear":
-        # Linear schedule from Ho et al, extended to work for any number of
-        # diffusion steps.
-        scale = 1000 / num_diffusion_timesteps
-        beta_start = scale * 0.0001
-        beta_end = scale * 0.02
-        return np.linspace(
-            beta_start, beta_end, num_diffusion_timesteps, dtype=np.float64
-        )
-    else:
-        raise NotImplementedError(f"unknown beta schedule: {schedule_name}")
-
-
-@register_model(name='ffhq256ddpm')
-class FFHQ256DDPM(DiffusionModel):
-    def __init__(self, model_config, schedule='linear', device='cuda'):
-        super().__init__()
-        self.net = create_model(**model_config).to(device)
-        self.net.eval()
-        self.device = device
-        # betas = np.array(betas, dtype=np.float64)
-        self.betas = get_named_beta_schedule(schedule, 1000)
-        alphas = 1.0 - self.betas
-        self.alphas_cumprod = np.cumprod(alphas, axis=0)
-        self.u = torch.tensor(np.sqrt((1 - self.alphas_cumprod) / self.alphas_cumprod), device=self.device)
-        # print(self.u)
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def inverse_schedule(self, sigma):
-        z = np.log(sigma ** 2 + 1)
-        beta_d = 19.9
-        beta_min = 0.1
-        t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-        return t
-
-    def tweedie(self, x, sigma=2e-3):
-        t = torch.tensor(int(self.inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(x.shape[0])
-        # print(torch.argmin((self.u-sigma).abs()), t)
-        model_output = self.net(x / math.sqrt(sigma ** 2 + 1), t)
-        # model_mean, pred_xstart = self.mean_processor.get_mean_and_xstart(x, t, model_output)
-        model_output, model_var_values = torch.split(model_output, x.shape[1], dim=1)
-        # print(x.abs().max(), model_output.abs().max())
-        return x - sigma * model_output.detach()
-
-
-@register_model(name='imagenet256ddpm')
-class ImageNet256DDPM(DiffusionModel):
-    def __init__(self, model_config, schedule='linear', device='cuda'):
-        super().__init__()
-        self.net = create_model(**model_config).to(device)
-        self.net.eval()
-        self.device = device
-        # betas = np.array(betas, dtype=np.float64)
-        self.betas = get_named_beta_schedule(schedule, 1000)
-        alphas = 1.0 - self.betas
-        self.alphas_cumprod = np.cumprod(alphas, axis=0)
-        self.u = torch.tensor(np.sqrt((1 - self.alphas_cumprod) / self.alphas_cumprod), device=self.device)
-        # print(self.u)
-
-    def score(self, x, sigma=2e-3):
-        d = self.tweedie(x, sigma)
-        return (d - x) / sigma ** 2
-
-    def inverse_schedule(self, sigma):
-        z = np.log(sigma ** 2 + 1)
-        beta_d = 19.9
-        beta_min = 0.1
-        t = (- beta_min + np.sqrt(beta_min ** 2 + 2 * beta_d * z)) / beta_d
-        return t
-
-    def tweedie(self, x, sigma=2e-3):
-        t = torch.tensor(int(self.inverse_schedule(sigma) * 999 + 1 / 2), device=self.device).repeat(x.shape[0])
-        # print(torch.argmin((self.u-sigma).abs()), t)
-        model_output = self.net(x / math.sqrt(sigma ** 2 + 1), t)
-        # model_mean, pred_xstart = self.mean_processor.get_mean_and_xstart(x, t, model_output)
-        model_output, model_var_values = torch.split(model_output, x.shape[1], dim=1)
-        # print(x.abs().max(), model_output.abs().max())
-        return x - sigma * model_output.detach()

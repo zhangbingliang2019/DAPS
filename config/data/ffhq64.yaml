@@ -1,0 +1,5 @@
+name: ffhq
+root: 'dataset/demo'
+resolution: 64
+start_id: 0
+end_id: 100
