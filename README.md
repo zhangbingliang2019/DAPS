@@ -40,7 +40,7 @@ We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for 
 
 
 
-#### 2. Prepare the pretrainedcheckpoint
+#### 2. Prepare the pretrained checkpoint
 
 Download the public available FFHQ checkpoint (ffhq_10m.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
 
