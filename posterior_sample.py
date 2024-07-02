@@ -136,6 +136,8 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
             x0y_traj = sde_traj.image_data['x0y']
             xt_traj = sde_traj.image_data['xt']
             for idx in range(total_number):
+                print()
+                print('save trajectories to mp4 videos...')
                 video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
                 save_mp4_video(resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
 
