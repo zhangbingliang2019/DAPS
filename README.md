@@ -115,22 +115,20 @@ replace the {TASK_NAME} by one of following:
 * `phase_retrieval`: phase retrival of oversample ratio of $2.0$
 
 * `down_sampling`: super resolution ($\times 4$)
+
 * `inpainting`:  128x128 box inpainting
+
 * `inpainting_rand`: $70\%$ random inpainting 
 
 * `gaussian_blur`: gaussian deblur of kernel size $61$ and intensity $3$
+
 * `motion_blur`: gaussian deblur of kernel size $61$ and intensity $0.5$
 
 * `nonlinear_blur`: nonlinear deblur of default setting in bkse repo
+
 * `hdr`: high dynamic range reconstruction of factor $2$ 
 
-
-
-## Customization
-
-We provide a [notebook](scripts/customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/customization.ipynb).
-
-
+  
 
 ## Citation
 
