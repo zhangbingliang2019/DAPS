@@ -267,6 +267,10 @@ class LangevinDynamics(nn.Module):
                 epsilon = torch.randn_like(x)
                 x.data = x.data + np.sqrt(2 * lr) * epsilon
 
+            # early stopping with NaN
+            if torch.isnan(x).any():
+                return torch.zeros_like(x)
+
             # record
             if record:
                 self._record(x, epsilon, loss)
