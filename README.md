@@ -2,11 +2,15 @@
 
 #### [website](https://daps-inverse-problem.github.io/) |  [paper](https://arxiv.org/abs/2407.01521)
 
-<p align="center">
-  <img src="README.assets/traj.gif" style="width:100%;" />
-</p>
+![img](README.assets/teaser.png)
 
-<video src="README.assets/traj.mp4"></video>
+## Abstract
+
+We propose a new method called Decoupled Annealing Posterior Sampling (DAPS) that relies on a novel noise annealing process to solve posterior sampling with diffusion prior. Specifically, we decouple consecutive steps in a diffusion sampling trajectory, allowing them to vary considerably from one another while ensuring their time-marginals anneal to the true posterior as we reduce noise levels. 
+
+![img](README.assets/method.png)
+
+Our approach enables the exploration of a larger solution space, improving the success rate for accurate reconstructions. We demonstrate that DAPS significantly improves sample quality and stability across multiple image restoration tasks, particularly in complicated nonlinear inverse problems. For example, we achieve a PSNR of 30.72dB on the FFHQ 256 dataset for phase retrieval, which is an improvement of 9.12dB compared to existing methods.
 
 ## Results
 
@@ -126,7 +130,9 @@ replace the {TASK_NAME} by one of following:
 
 
 
-## Reference
+## Citation
+
+If you find our work interesting, please consider citing
 
 ```
 @misc{zhang2024improvingdiffusioninverseproblem,
