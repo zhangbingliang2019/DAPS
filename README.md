@@ -126,6 +126,10 @@ replace the {TASK_NAME} by one of following:
 
 
 
+## Customization
+
+We provide a [notebook](scripts/customization.ipynb) for detailed guidance 
+
 ## Citation
 
 If you find our work interesting, please consider citing
