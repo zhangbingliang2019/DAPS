@@ -2,6 +2,10 @@
 
 #### [website](https://daps-inverse-problem.github.io/) |  [paper](https://arxiv.org/abs/2407.01521)
 
+<p align="center">
+  <img src="README.assets/traj.gif" style="width:100%;" />
+</p>
+
 <video src="README.assets/traj.mp4"></video>
 
 ## Results
