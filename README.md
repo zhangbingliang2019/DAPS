@@ -2,11 +2,7 @@
 
 #### [website](https://daps-inverse-problem.github.io/) |  [paper](https://arxiv.org/abs/2407.01521)
 
-<p align="center">
-  <img src="README.assets/traj.gif" style="width:100%;" />
-    <img src="README.assets/traj-cap.png" style="width:70%; text-align: center;" />
-</p>
-<video src="/Users/bingliangzhang/Downloads/traj.mp4"></video>
+<video src="README.assets/traj.mp4"></video>
 
 ## Results
 
