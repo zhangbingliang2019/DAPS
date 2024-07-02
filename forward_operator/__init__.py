@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from torchvision.utils import save_image
 from .resizer import Resizer
 import torch.nn.functional as F
 from .fastmri_utils import fft2c_new
@@ -11,8 +10,8 @@ import scipy
 import numpy as np
 import yaml
 
-
 __OPERATOR__ = {}
+
 
 def register_operator(name: str):
     def wrapper(cls):
@@ -20,6 +19,7 @@ def register_operator(name: str):
             raise NameError(f"Name {name} is already registered!")
         __OPERATOR__[name] = cls
         return cls
+
     return wrapper
 
 
@@ -30,7 +30,7 @@ def get_operator(name: str, **kwargs):
 
 
 class Operator(ABC):
-    def __init__(self, sigma=0.701):
+    def __init__(self, sigma=0.05):
         self.sigma = sigma
 
     @abstractmethod
@@ -54,14 +54,13 @@ class Operator(ABC):
 # Linear Operator
 @register_operator(name='down_sampling')
 class DownSampling(Operator):
-    def __init__(self, resolution=256, scale_factor=4, device='cuda', sigma=0.701):
+    def __init__(self, resolution=256, scale_factor=4, device='cuda', sigma=0.05):
         super().__init__(sigma)
         in_shape = [1, 3, resolution, resolution]
         self.down_sample = Resizer(in_shape, 1 / scale_factor).to(device)
 
     def __call__(self, x):
         return self.down_sample(x)
-
 
 
 def random_sq_bbox(img, mask_shape, image_size=256, margin=(16, 16)):
@@ -79,9 +78,9 @@ def random_sq_bbox(img, mask_shape, image_size=256, margin=(16, 16)):
 
     # make mask
     mask = torch.ones([B, C, H, W], device=img.device)
-    mask[..., t:t+h, l:l+w] = 0
+    mask[..., t:t + h, l:l + w] = 0
 
-    return mask, t, t+h, l, l+w
+    return mask, t, t + h, l, l + w
 
 
 class mask_generator:
@@ -106,9 +105,9 @@ class mask_generator:
         mask_h = np.random.randint(l, h)
         mask_w = np.random.randint(l, h)
         mask, t, tl, w, wh = random_sq_bbox(img,
-                              mask_shape=(mask_h, mask_w),
-                              image_size=self.image_size,
-                              margin=self.margin)
+                                            mask_shape=(mask_h, mask_w),
+                                            image_size=self.image_size,
+                                            margin=self.margin)
         return mask, t, tl, w, wh
 
     def _retrieve_random(self, img):
@@ -137,18 +136,21 @@ class mask_generator:
             mask = 1. - mask
             return mask
 
+
 @register_operator(name='inpainting')
 class Inpainting(Operator):
-    def __init__(self, mask_type, mask_len_range=None, mask_prob_range=None, resolution=256, device='cuda', sigma=0.701):
+    def __init__(self, mask_type, mask_len_range=None, mask_prob_range=None, resolution=256, device='cuda',
+                 sigma=0.05):
         super().__init__(sigma)
         self.mask_gen = mask_generator(mask_type, mask_len_range, mask_prob_range, resolution)
-        self.mask = None # [B, 1, H, W]
+        self.mask = None  # [B, 1, H, W]
 
     def __call__(self, x):
         if self.mask is None:
             self.mask = self.mask_gen(x)
             self.mask = self.mask[0:1, 0:1, :, :]
         return x * self.mask
+
 
 class Blurkernel(nn.Module):
     def __init__(self, blur_type='gaussian', kernel_size=31, std=3.0, device=None):
@@ -158,7 +160,7 @@ class Blurkernel(nn.Module):
         self.std = std
         self.device = device
         self.seq = nn.Sequential(
-            nn.ReflectionPad2d(self.kernel_size//2),
+            nn.ReflectionPad2d(self.kernel_size // 2),
             nn.Conv2d(3, 3, self.kernel_size, stride=1, padding=0, bias=False, groups=3)
         )
 
@@ -170,7 +172,7 @@ class Blurkernel(nn.Module):
     def weights_init(self):
         if self.blur_type == "gaussian":
             n = np.zeros((self.kernel_size, self.kernel_size))
-            n[self.kernel_size // 2,self.kernel_size // 2] = 1
+            n[self.kernel_size // 2, self.kernel_size // 2] = 1
             k = scipy.ndimage.gaussian_filter(n, sigma=self.std)
             k = torch.from_numpy(k)
             self.k = k
@@ -192,9 +194,10 @@ class Blurkernel(nn.Module):
     def get_kernel(self):
         return self.k
 
+
 @register_operator(name='gaussian_blur')
 class GaussianBlur(Operator):
-    def __init__(self, kernel_size, intensity,  device='cuda', sigma=0.701):
+    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.kernel_size = kernel_size
@@ -212,7 +215,7 @@ class GaussianBlur(Operator):
 
 @register_operator(name='motion_blur')
 class MotionBlur(Operator):
-    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.701):
+    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.kernel_size = kernel_size
@@ -234,7 +237,7 @@ class MotionBlur(Operator):
 # Non-linear Operator
 @register_operator(name='phase_retrieval')
 class PhaseRetrieval(Operator):
-    def __init__(self, oversample=0.0, resolution=256, sigma=0.701):
+    def __init__(self, oversample=0.0, resolution=256, sigma=0.05):
         super().__init__(sigma)
         self.pad = int((oversample / 8.0) * resolution)
 
@@ -248,9 +251,10 @@ class PhaseRetrieval(Operator):
         # amplitude = (amplitude - amplitude.min()) / (amplitude.max() - amplitude.min())
         return amplitude
 
+
 @register_operator(name='nonlinear_blur')
 class NonlinearBlur(Operator):
-    def __init__(self, opt_yml_path, device='cuda', sigma=0.701):
+    def __init__(self, opt_yml_path, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.blur_model = self.prepare_nonlinear_blur_model(opt_yml_path)
@@ -275,11 +279,11 @@ class NonlinearBlur(Operator):
         return blur_model
 
     def call_old(self, data):
-        #random_kernel = torch.randn(1, 512, 2, 2).to(self.device) * 1.2
+        # random_kernel = torch.randn(1, 512, 2, 2).to(self.device) * 1.2
         data = (data + 1.0) / 2.0  # [-1, 1] -> [0, 1]
         blurred = []
         for i in range(data.shape[0]):
-            single_blurred = self.blur_model.adaptKernel(data[i:i+1], kernel=self.random_kernel)
+            single_blurred = self.blur_model.adaptKernel(data[i:i + 1], kernel=self.random_kernel)
             blurred.append(single_blurred)
         blurred = torch.cat(blurred, dim=0)
         blurred = (blurred * 2.0 - 1.0).clamp(-1, 1)  # [0, 1] -> [-1, 1]
@@ -303,11 +307,10 @@ class NonlinearBlur(Operator):
 
 @register_operator(name='high_dynamic_range')
 class HighDynamicRange(Operator):
-    def __init__(self, device='cuda', scale=2, sigma=0.701):
+    def __init__(self, device='cuda', scale=2, sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.scale = scale
 
     def __call__(self, data):
         return torch.clip((data * self.scale), -1, 1)
-

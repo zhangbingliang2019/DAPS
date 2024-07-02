@@ -1,455 +1,466 @@
-from abc import ABC, abstractmethod
 import tqdm
-from torch.utils.checkpoint import checkpoint as torch_checkpoint
 import torch
 import numpy as np
 import torch.nn as nn
-from piq import psnr, LPIPS
 
 
 def get_sampler(**kwargs):
     latent = kwargs['latent']
     kwargs.pop('latent')
     if latent:
-        return LatentDiffusionSampler(**kwargs)
-    return DiffusionSampler(**kwargs)
+        raise NotImplementedError
+    return DAPS(**kwargs)
 
 
-class DiffusionSampler(nn.Module):
-    def __init__(self, num_steps=200, solver='euler', scheduler='linear', timestep='poly-7', sigma_max=100,
-                 sigma_min=0.01,
-                 sigma_final=None, likelihood_estimator_config=None):
+class Scheduler(nn.Module):
+    """
+        Scheduler for diffusion sigma(t) and discretization step size Delta t
+    """
+
+    def __init__(self, num_steps=10, sigma_max=100, sigma_min=0.01, sigma_final=None, schedule='linear',
+                 timestep='poly-7'):
+        """
+            Initializes the scheduler with the given parameters.
+
+            Parameters:
+                num_steps (int): Number of steps in the schedule.
+                sigma_max (float): Maximum value of sigma.
+                sigma_min (float): Minimum value of sigma.
+                sigma_final (float): Final value of sigma, defaults to sigma_min.
+                schedule (str): Type of schedule for sigma ('linear' or 'sqrt').
+                timestep (str): Type of timestep function ('log' or 'poly-n').
+        """
         super().__init__()
         self.num_steps = num_steps
-        self.solver = solver
-        self.scheduler = scheduler
-        self.timestep = timestep
         self.sigma_max = sigma_max
         self.sigma_min = sigma_min
         self.sigma_final = sigma_final
         if self.sigma_final is None:
-            self.sigma_final = max(0, self.sigma_min - 0.01)
+            self.sigma_final = self.sigma_min
+        self.schedule = schedule
+        self.timestep = timestep
 
-        if likelihood_estimator_config is None:
-            self.likelihood_estimator = None
-        else:
-            self.likelihood_estimator = get_estimator(**likelihood_estimator_config)
-
-        # get discretization
         steps = np.linspace(0, 1, num_steps)
-        sigma_fn, sigma_derivative_fn, sigma_inv_fn = self.get_sigma_fn(self.scheduler)
+        sigma_fn, sigma_derivative_fn, sigma_inv_fn = self.get_sigma_fn(self.schedule)
         time_step_fn = self.get_time_step_fn(self.timestep, self.sigma_max, self.sigma_min)
 
         time_steps = np.array([time_step_fn(s) for s in steps])
         time_steps = np.append(time_steps, sigma_inv_fn(self.sigma_final))
         sigma_steps = np.array([sigma_fn(t) for t in time_steps])
 
+        # factor = 2\dot\sigma(t)\sigma(t)\Delta t
         factor_steps = np.array(
             [2 * sigma_fn(time_steps[i]) * sigma_derivative_fn(time_steps[i]) * (time_steps[i] - time_steps[i + 1]) for
              i in range(num_steps)])
         self.sigma_steps, self.time_steps, self.factor_steps = sigma_steps, time_steps, factor_steps
+        self.factor_steps = [max(f, 0) for f in self.factor_steps]
 
-        # for safety issue
-        self.factor_steps = [max(f, 2e-4) for f in self.factor_steps]
-
-    def get_sigma_fn(self, scheduler):
-        if scheduler == 'sqrt':
+    def get_sigma_fn(self, schedule):
+        """
+            Returns the sigma function, its derivative, and its inverse based on the given schedule.
+        """
+        if schedule == 'sqrt':
             sigma_fn = lambda t: np.sqrt(t)
             sigma_derivative_fn = lambda t: 1 / 2 / np.sqrt(t)
             sigma_inv_fn = lambda sigma: sigma ** 2
 
-        elif scheduler == 'linear':
+        elif schedule == 'linear':
             sigma_fn = lambda t: t
             sigma_derivative_fn = lambda t: 1
             sigma_inv_fn = lambda t: t
-
         else:
             raise NotImplementedError
         return sigma_fn, sigma_derivative_fn, sigma_inv_fn
 
     def get_time_step_fn(self, timestep, sigma_max, sigma_min):
+        """
+            Returns the time step function based on the given timestep type.
+        """
         if timestep == 'log':
             get_time_step_fn = lambda r: sigma_max ** 2 * (sigma_min ** 2 / sigma_max ** 2) ** r
-
         elif timestep.startswith('poly'):
             p = int(timestep.split('-')[1])
             get_time_step_fn = lambda r: (sigma_max ** (1 / p) + r * (sigma_min ** (1 / p) - sigma_max ** (1 / p))) ** p
-
-        # double_poly-{order}-{t_cut}-{first_sigma_min}-{second_sigma_max}
-        elif timestep.startswith('double_poly'):
-            # print('scheduler: ', timestep)
-            tmp = timestep.split('-')[1:]
-            p, t_cut, first_sigma_min, second_sigma_max = int(tmp[0]), float(tmp[1]), float(tmp[2]), float(tmp[3])
-
-            def get_time_step_fn(r):
-                if r < t_cut:
-                    return (sigma_max ** (1 / p) + r / t_cut * (first_sigma_min ** (1 / p) - sigma_max ** (1 / p))) ** p
-                else:
-                    return (second_sigma_max ** (1 / p) + (r - t_cut) / (1 - t_cut) * (
-                                sigma_min ** (1 / p) - second_sigma_max ** (1 / p))) ** p
         else:
             raise NotImplementedError
         return get_time_step_fn
 
-    def _euler(self, model, x_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
-        pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
-        x = x_start
-        for s in pbar:
-            if checkpoint:
-                prior_score = torch_checkpoint(model.score, x, self.sigma_steps[s])
-            else:
-                prior_score = model.score(x, self.sigma_steps[s])
-            if record:
-                self.sde_traj.add_image('prior_score', prior_score)
-                self.sde_traj.add_value('sigma', self.sigma_steps[s])
-            if self.likelihood_estimator is not None and op is not None and y is not None:
-                likelihood_score, likelihood_weight = self.likelihood_estimator.noisy_likelihood_score(model, x, op, y,
-                                                                                                       self.sigma_steps[
-                                                                                                           s],
-                                                                                                       s / self.num_steps)
-                if record:
-                    self.sde_traj.add_image('likelihood_score', likelihood_score)
-                    self.sde_traj.add_value('likelihood_weight', likelihood_weight)
-                    self.likelihood_estimator.record(self.sde_traj)
-                score = prior_score + likelihood_weight * likelihood_score
-            else:
-                score = prior_score
-                if record:
-                    self.sde_traj.add_image('likelihood_score', torch.zeros_like(x))
-                    self.sde_traj.add_value('likelihood_weight', 0)
 
-            if SDE:
-                epsilon = torch.randn_like(x)
-                if record:
-                    self.sde_traj.add_image('epsilon', epsilon)
-                    self.sde_traj.add_image('xt', x)
-                    self.sde_traj.add_value('factor', self.factor_steps[s])
-                x = x + self.factor_steps[s] * score + np.sqrt(self.factor_steps[s]) * epsilon
-            else:
-                if record:
-                    self.sde_traj.add_image('epsilon', torch.zeros_like(x))
-                    self.sde_traj.add_image('xt', x)
-                    self.sde_traj.add_value('factor', self.factor_steps[s])
-                x = x + self.factor_steps[s] * score * 0.5
-        if record:
-            self.sde_traj.add_image('xt', x)
-        return x
+class DiffusionSampler(nn.Module):
+    """
+        Diffusion sampler for reverse SDE or PF-ODE
+    """
 
-    def _daps(self, model, x_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
-        pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
-        x = x_start
-        for s in pbar:
-            if record:
-                self.sde_traj.add_image('xt', x)
-            # x0hat = model.tweedie(x, self.sigma_steps[s])
-            x0y, _ = self.likelihood_estimator.noisy_likelihood_score(model, x, op, y, self.sigma_steps[s],
-                                                                      s, self.num_steps, False)
+    def __init__(self, scheduler, solver='euler'):
+        """
+            Initializes the diffusion sampler with the given scheduler and solver.
 
-            x = x0y + self.sigma_steps[s + 1] * torch.randn_like(x0y)
+            Parameters:
+                scheduler (Scheduler): Scheduler instance for managing sigma and timesteps.
+                solver (str): Solver method ('euler').
+        """
+        super().__init__()
+        self.scheduler = scheduler
+        self.solver = solver
 
-            if torch.isnan(x).any():
-                return x
+    def sample(self, model, x_start, SDE=False, record=False, verbose=False):
+        """
+            Samples from the diffusion process using the specified model.
 
-            if record:
-                # self.sde_traj.add_image('tweedie', x0hat)
-                self.sde_traj.add_image('x0y', x0y)
-                self.likelihood_estimator.record(self.sde_traj)
+            Parameters:
+                model (DiffusionModel): Diffusion model supports 'score' and 'tweedie'
+                x_start (torch.Tensor): Initial state.
+                SDE (bool): Whether to use Stochastic Differential Equations.
+                record (bool): Whether to record the trajectory.
+                verbose (bool): Whether to display progress bar.
 
-        if record:
-            self.sde_traj.add_image('xt', x)
-        return x
-
-    def sample(self, model, x_start, op=None, y=None, SDE=False, verbose=False, record=False, checkpoint=False):
-        self.sde_traj = SDETrajectory()
+            Returns:
+                torch.Tensor: The final sampled state.
+        """
         if self.solver == 'euler':
-            return self._euler(model, x_start, op, y, SDE, verbose, record, checkpoint)
-        elif self.solver == 'daps':
-            return self._daps(model, x_start, op, y, SDE, verbose, record, checkpoint)
+            return self._euler(model, x_start, SDE, record, verbose)
         else:
             raise NotImplementedError
 
+    def _euler(self, model, x_start, SDE=False, record=False, verbose=False):
+        """
+            Euler's method for sampling from the diffusion process.
+        """
+        if record:
+            self.trajectory = Trajectory()
+        pbar = tqdm.trange(self.scheduler.num_steps) if verbose else range(self.scheduler.num_steps)
+
+        x = x_start
+        for step in pbar:
+            sigma, factor = self.scheduler.sigma_steps[step], self.scheduler.factor_steps[step]
+            score = model.score(x, sigma)
+            if SDE:
+                epsilon = torch.randn_like(x)
+                x = x + factor * score + np.sqrt(factor) * epsilon
+            else:
+                x = x + factor * score * 0.5
+
+            # record
+            if record:
+                if SDE:
+                    self._record(x, score, sigma, factor, epsilon)
+                else:
+                    self._record(x, score, sigma, factor)
+        return x
+
+    def _record(self, x, score, sigma, factor, epsilon=None):
+        """
+            Records the intermediate states during sampling.
+        """
+        self.trajectory.add_image(f'xt', x)
+        self.trajectory.add_image(f'score', score)
+        self.trajectory.add_value(f'sigma', sigma)
+        self.trajectory.add_value(f'factor', factor)
+        if epsilon is not None:
+            self.trajectory.add_image(f'epsilon', epsilon)
+
     def get_start(self, ref):
-        x_start = torch.randn_like(ref) * self.sigma_max
+        """
+            Generates a random initial state based on the reference tensor.
+
+            Parameters:
+                ref (torch.Tensor): Reference tensor for shape and device.
+
+            Returns:
+                torch.Tensor: Initial random state.
+        """
+        x_start = torch.randn_like(ref) * self.scheduler.sigma_max
         return x_start
 
 
 class LatentDiffusionSampler(DiffusionSampler):
-    def __init__(self, channel=3, down_factor=4, num_steps=200, solver='euler', scheduler='linear', timestep='poly-7',
-                 sigma_max=150, sigma_min=0.01,
-                 sigma_final=None, likelihood_estimator_config=None):
-        super().__init__(num_steps, solver, scheduler, timestep, sigma_max, sigma_min, sigma_final,
-                         likelihood_estimator_config)
-        self.down_factor = down_factor
-        self.channel = channel
+    """
+        Latent Diffusion sampler for reverse SDE or PF-ODE
+    """
 
-    def _daps(self, model, z_start, op, y, SDE=False, verbose=False, record=False, checkpoint=False):
-        pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
-        z = z_start
-        for s in pbar:
-            # print('sigma: ', self.sigma_steps[s])
-            if record:
-                self.sde_traj.add_image('zt', z)
-            # x0hat = model.tweedie(x, self.sigma_steps[s])
-            z0y, _ = self.likelihood_estimator.noisy_likelihood_score(model, z, op, y, self.sigma_steps[s], s,
-                                                                      self.num_steps, True)
-            z = z0y + self.sigma_steps[s + 1] * torch.randn_like(z0y)
+    def __init__(self, scheduler, solver='euler'):
+        """
+            Initializes the latent diffusion sampler with the given scheduler and solver.
 
-            if torch.isnan(z).any():
-                return z
+            Parameters:
+                scheduler (Scheduler): Scheduler instance for managing sigma and timesteps.
+                solver (str): Solver method ('euler').
+        """
+        super().__init__(scheduler, solver)
 
-            if record:
-                self.sde_traj.add_image('z0y', z0y)
-                self.likelihood_estimator.record(self.sde_traj)
+    def sample(self, model, z_start, SDE=False, record=False, verbose=False, return_latent=True):
+        """
+            Samples from the latent diffusion process using the specified model.
 
-        if record:
-            self.sde_traj.add_image('zt', z)
-        return z
+            Parameters:
+                model (LatentDiffusionModel): Diffusion model supports 'score', 'tweedie', 'encode' and 'decode'
+                z_start (torch.Tensor): Initial latent state.
+                SDE (bool): Whether to use Stochastic Differential Equations.
+                record (bool): Whether to record the trajectory.
+                verbose (bool): Whether to display progress bar.
+                return_latent (bool): Whether to return the latent state or decoded state.
 
-    def sample(self, model, z_start, op=None, y=None, SDE=False, verbose=False, record=False, checkpoint=False,
-               return_latent=False):
-        self.sde_traj = SDETrajectory()
+            Returns:
+                torch.Tensor: The final sampled state (latent or decoded).
+        """
         if self.solver == 'euler':
-            assert op is None and y is None
-            z0 = self._euler(model, z_start, op, y, SDE, verbose, record, checkpoint)
-        elif self.solver == 'daps':
-            z0 = self._daps(model, z_start, op, y, SDE, verbose, record, checkpoint)
-        # elif self.solver == 'heun':
-        #     return self._heun(model, x_start, op, y, SDE, verbose)
+            z0 = self._euler(model, z_start, SDE, record, verbose)
         else:
             raise NotImplementedError
-
         if return_latent:
-            return model.decode(z0), z0
-        return model.decode(z0)
+            return z0
+        else:
+            x0 = model.decode(z0)
+            return x0
+
+
+class LangevinDynamics(nn.Module):
+    """
+        Langevin Dynamics sampling method.
+    """
+
+    def __init__(self, num_steps, lr, tau=0.01, lr_min_ratio=0.01):
+        """
+            Initializes the Langevin dynamics sampler with the given parameters.
+
+            Parameters:
+                num_steps (int): Number of steps in the sampling process.
+                lr (float): Learning rate.
+                tau (float): Noise parameter.
+                lr_min_ratio (float): Minimum learning rate ratio.
+        """
+        super().__init__()
+        self.num_steps = num_steps
+        self.lr = lr
+        self.tau = tau
+        self.lr_min_ratio = lr_min_ratio
+
+    def sample(self, x0hat, operator, measurement, sigma, ratio, record=False, verbose=False):
+        """
+            Samples using Langevin dynamics.
+
+            Parameters:
+                x0hat (torch.Tensor): Initial state.
+                operator (Operator): Operator module.
+                measurement (torch.Tensor): Measurement tensor.
+                sigma (float): Current sigma value.
+                ratio (float): Current step ratio.
+                record (bool): Whether to record the trajectory.
+                verbose (bool): Whether to display progress bar.
+
+            Returns:
+                torch.Tensor: The final sampled state.
+        """
+        if record:
+            self.trajectory = Trajectory()
+        pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
+        lr = self.get_lr(ratio)
+        x = x0hat.clone().detach().requires_grad_(True)
+        optimizer = torch.optim.SGD([x], lr)
+        for _ in pbar:
+            optimizer.zero_grad()
+            loss = operator.error(x, measurement).sum() / (2 * self.tau ** 2)
+            loss += ((x - x0hat) ** 2).sum() / (2 * sigma ** 2)
+            loss.backward()
+            optimizer.step()
+            with torch.no_grad():
+                epsilon = torch.randn_like(x)
+                x.data = x.data + np.sqrt(2 * lr) * epsilon
+
+            # record
+            if record:
+                self._record(x, epsilon, loss)
+        return x.detach()
+
+    def _record(self, x, epsilon, loss):
+        """
+            Records the intermediate states during sampling.
+        """
+        self.trajectory.add_image(f'xi', x)
+        self.trajectory.add_image(f'epsilon', epsilon)
+        self.trajectory.add_value(f'loss', loss)
+
+    def get_lr(self, ratio):
+        """
+            Computes the learning rate based on the given ratio.
+        """
+        p = 1
+        multiplier = (1 ** (1 / p) + ratio * (self.lr_min_ratio ** (1 / p) - 1 ** (1 / p))) ** p
+        return multiplier * self.lr
+
+
+class DAPS(nn.Module):
+    """
+        Implementation of decoupled annealing posterior sampling.
+    """
+
+    def __init__(self, annealing_scheduler_config, diffusion_scheduler_config, lgvd_config):
+        """
+            Initializes the DAPS sampler with the given configurations.
+
+            Parameters:
+                annealing_scheduler_config (dict): Configuration for annealing scheduler.
+                diffusion_scheduler_config (dict): Configuration for diffusion scheduler.
+                lgvd_config (dict): Configuration for Langevin dynamics.
+        """
+        super().__init__()
+        annealing_scheduler_config, diffusion_scheduler_config = self._check(annealing_scheduler_config,
+                                                                             diffusion_scheduler_config)
+        self.annealing_scheduler = Scheduler(**annealing_scheduler_config)
+        self.diffusion_scheduler_config = diffusion_scheduler_config
+        self.lgvd = LangevinDynamics(**lgvd_config)
+
+    def sample(self, model, x_start, operator, measurement, evaluator=None, record=False, verbose=False):
+        """
+            Samples using the DAPS method.
+
+            Parameters:
+                model (nn.Module): (Latent) Diffusion model
+                x_start (torch.Tensor): Initial state.
+                operator (nn.Module): Operator module.
+                measurement (torch.Tensor): Measurement tensor.
+                evaluator (Evaluator): Evaluation function.
+                record (bool): Whether to record the trajectory.
+                verbose (bool): Whether to display progress bar.
+
+            Returns:
+                torch.Tensor: The final sampled state.
+        """
+        if record:
+            self.trajectory = Trajectory()
+        pbar = tqdm.trange(self.annealing_scheduler.num_steps) if verbose else range(self.annealing_scheduler.num_steps)
+        xt = x_start
+        for step in pbar:
+            sigma = self.annealing_scheduler.sigma_steps[step]
+            # 1. reverse diffusion
+            diffusion_scheduler = Scheduler(**self.diffusion_scheduler_config, sigma_max=sigma)
+            sampler = DiffusionSampler(diffusion_scheduler)
+            with torch.no_grad():
+                x0hat = sampler.sample(model, xt, SDE=False, verbose=False)
+
+            # 2. langevin dynamics
+            x0y = self.lgvd.sample(x0hat, operator, measurement, sigma, step / self.annealing_scheduler.num_steps)
+
+            # 3. forward diffusion
+            xt = x0y + torch.randn_like(x0y) * self.annealing_scheduler.sigma_steps[step + 1]
+
+            # 4. evaluation
+            x0hat_results = x0y_results = None
+            if evaluator:
+                x0hat_results = evaluator(x0hat)
+                x0y_results = evaluator(x0y)
+
+                # record
+                if verbose:
+                    main_eval_fn_name = evaluator.main_eval_fn_name
+                    pbar.set_postfix({
+                        'x0hat' + '_' + main_eval_fn_name: f"{x0hat_results[main_eval_fn_name].item():.2f}",
+                        'x0y' + '_' + main_eval_fn_name: f"{x0y_results[main_eval_fn_name].item():.2f}",
+                    })
+            if record:
+                self._record(xt, x0y, x0hat, sigma, x0hat_results, x0y_results)
+        return xt
+
+    def _record(self, xt, x0y, x0hat, sigma, x0hat_results, x0y_results):
+        """
+            Records the intermediate states during sampling.
+        """
+        self.trajectory.add_image(f'xt', xt)
+        self.trajectory.add_image(f'x0y', x0y)
+        self.trajectory.add_image(f'x0hat', x0hat)
+        self.trajectory.add_value(f'sigma', sigma)
+        for name in x0hat_results.keys():
+            self.trajectory.add_value(f'x0hat_{name}', x0hat_results[name])
+        for name in x0y_results.keys():
+            self.trajectory.add_value(f'x0y_{name}', x0y_results[name])
+
+    def _check(self, annealing_scheduler_config, diffusion_scheduler_config):
+        """
+            Checks and updates the configurations for the schedulers.
+        """
+        # sigma_max of diffusion scheduler change each step
+        if 'sigma_max' in diffusion_scheduler_config:
+            diffusion_scheduler_config.pop('sigma_max')
+
+        # sigma final of annealing scheduler should always be 0
+        annealing_scheduler_config['sigma_final'] = 0
+        return annealing_scheduler_config, diffusion_scheduler_config
 
     def get_start(self, ref):
-        shape = [ref.shape[0], self.channel, ref.shape[2] // self.down_factor, ref.shape[3] // self.down_factor]
-        x_start = torch.randn(shape).to(ref.device) * self.sigma_max
+        """
+            Generates a random initial state based on the reference tensor.
+
+            Parameters:
+                ref (torch.Tensor): Reference tensor for shape and device.
+
+            Returns:
+                torch.Tensor: Initial random state.
+        """
+        x_start = torch.randn_like(ref) * self.annealing_scheduler.sigma_max
         return x_start
 
 
-class LikelihoodEstimator(ABC):
-    @abstractmethod
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_step, totoal_step, latent=False):
-        # return likelihood_score, likelihood_weight
-        pass
+class Trajectory(nn.Module):
+    """
+        Class for recording and storing trajectory data.
+    """
 
-    def record(self, sde_traj):
-        pass
-
-
-__ESTIMATOR__ = {}
-
-
-def register_estimator(name: str):
-    def wrapper(cls):
-        if __ESTIMATOR__.get(name, None):
-            raise NameError(f"Name {name} is already registered!")
-        __ESTIMATOR__[name] = cls
-        return cls
-
-    return wrapper
-
-
-def get_estimator(name: str, **kwargs):
-    if __ESTIMATOR__.get(name, None) is None:
-        raise NameError(f"Name {name} is not defined.")
-    return __ESTIMATOR__[name](**kwargs)
-
-
-@register_estimator(name='langevin')
-class Langevin(LikelihoodEstimator):
-    def __init__(self, step=100, lr=0.1, ode_step=10, tau=0.1, lr_scheduler='decay', space='pixel', rescale=1,
-                 milestone=1, return_ode=True, SDE=False, optimizer='sgd', lr_min_ratio=0.01):
-        self.langevin_step = step
-        self.lr = float(lr)
-        self.ode_step = ode_step
-        self.tau = float(tau)
-        self.lr_scheduler = lr_scheduler
-        self.space = space
-        self.rescale = rescale
-        self.milestone = milestone
-        self.return_ode = return_ode
-        self.optimizer = optimizer
-        self.SDE = SDE
-        self.lr_min_ratio = lr_min_ratio
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_step, totoal_step, latent=False):
-        if latent:
-            return self.latent_score(model, x, op, y, sigma, time_step, totoal_step)
-        else:
-            return self.pixel_score(model, x, op, y, sigma, time_step, totoal_step)
-
-    def pixel_score(self, model, x, op, y, sigma, time_step, total_step):
-        # print(sigma)
-        sampler = DiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                   sigma_max=sigma, sigma_min=0.01)
-        with torch.no_grad():
-            x0 = sampler.sample(model, x, SDE=self.SDE, verbose=False)
-        self.x0 = x0
-        if time_step != total_step - 1 or not self.return_ode:
-            x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
-        else:
-            x = x0
-        return x, None
-
-    def latent_score(self, model, z, op, y, sigma, time_step, total_step):
-        sampler = LatentDiffusionSampler(num_steps=self.ode_step, solver='euler', scheduler='linear', timestep='poly-7',
-                                         sigma_max=sigma, sigma_min=0.01)
-        # if sigma < self.tau:
-        #     return x, None
-        with torch.no_grad():
-            x0, z0 = sampler.sample(model, z, SDE=self.SDE, verbose=False, return_latent=True)
-
-        self.x0 = x0
-        self.z0 = z0
-        # print(time_step, totoal_step)
-        if time_step != total_step - 1 or not self.return_ode:
-            if self.space == 'auto':
-                # if time_step / totoal_step >= 2 / 3:
-                if sigma <= self.milestone:
-                    z = self.langevin_latent(model, z0, sigma, op, y, time_step / total_step)
-                else:
-                    x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
-                    z = model.encode(x)
-            elif self.space == 'pixel':
-                x = self.langevin_pixel(model, x0, sigma, op, y, time_step / total_step)
-                self.x0opt = x
-                z = model.encode(x)
-            else:
-                z = self.langevin_latent(model, z0, sigma, op, y, time_step / total_step)
-
-        else:
-            z = z0
-        return z, None
-
-    def get_optimizer(self, x, lr):
-        if self.optimizer == 'sgd':
-            return torch.optim.SGD([x], lr)
-        elif self.optimizer == 'adam':
-            return torch.optim.Adam([x], lr)
-
-    def get_learning_rate_multiplier(self, r):
-        p = 1
-        return (1 ** (1 / p) + r * (self.lr_min_ratio ** (1 / p) - 1 ** (1 / p))) ** p
-
-    def langevin_pixel(self, model, x0, sigma, op, y, ratio):
-        x = x0.clone().detach().requires_grad_(True)
-        if self.lr_scheduler == 'sigma':
-            lr = self.lr * sigma
-        elif self.lr_scheduler == 'none':
-            lr = self.lr
-        else:
-            # print('Here')
-            # lr = self.lr * sigma / self.sigma_max
-            lr = self.lr * self.get_learning_rate_multiplier(ratio)
-            # print('lr: ', lr)
-        optimizer = self.get_optimizer(x, lr)
-
-        for _ in range(self.langevin_step):
-            optimizer.zero_grad()
-            loss = op.error(x, y).sum() / self.tau ** 2
-            loss += ((x - x0) ** 2).sum() / (2 * sigma ** 2)
-            loss.backward()
-            # print(x.grad.max() * lr, x.grad.min() * lr)
-            # print(x.max(), x.min())
-            # print()
-            optimizer.step()
-            with torch.no_grad():
-                x.data = x.data + np.sqrt(2 * lr) * torch.randn_like(x)
-
-            if torch.isnan(x).any():
-                return x.detach()
-        return x.detach()
-
-    def langevin_latent(self, model, z0, sigma, op, y, ratio):
-        z = z0.clone().detach().requires_grad_(True)
-        if self.lr_scheduler == 'sigma':
-            lr = self.lr * sigma
-        elif self.lr_scheduler == 'none':
-            lr = self.lr
-        else:
-            # print('Here')
-            lr = self.lr * self.get_learning_rate_multiplier(ratio)
-        optimizer = self.get_optimizer(z, lr)
-
-        for _ in range(self.langevin_step):
-            optimizer.zero_grad()
-            x = model.decode(z)
-            loss = self.rescale * op.error(x, y).sum() / self.tau ** 2
-            loss += ((z - z0) ** 2).sum() / (2 * sigma ** 2)
-            loss.backward()
-            # print(z.grad.max() * lr, z.grad.min() * lr)
-            # print(z.max(), z.min())
-            # print('latent')
-            # print()
-            optimizer.step()
-            with torch.no_grad():
-                z.data = z.data + np.sqrt(2 * lr) * torch.randn_like(z)
-
-            if torch.isnan(z).any():
-                return z.detach()
-        return z.detach()
-
-    def record(self, sde_traj):
-        sde_traj.add_image('tweedie', self.x0)
-        if hasattr(self, 'z0'):
-            sde_traj.add_image('z0', self.z0)
-        if hasattr(self, 'x0opt'):
-            sde_traj.add_image('x0opt', self.x0opt)
-
-
-@register_estimator(name='double_langevin')
-class DoubleEstimator(LikelihoodEstimator):
-    def __init__(self, t_cut, config1, config2):
-        self.t_cut = t_cut
-        self.lgv1 = get_estimator(**config1)
-        self.lgv2 = get_estimator(**config2)
-        self.ptr = 1
-
-    def noisy_likelihood_score(self, model, x, op, y, sigma, time_step, totoal_step, latent=False):
-        if time_step / totoal_step < self.t_cut:
-            self.ptr = 1
-            # print('pointer: ', self.ptr)
-            return self.lgv1.noisy_likelihood_score(model, x, op, y, sigma, time_step, totoal_step, latent)
-        else:
-            self.ptr = 2
-            # print('pointer: ', self.ptr)
-            return self.lgv2.noisy_likelihood_score(model, x, op, y, sigma, time_step, totoal_step, latent)
-
-    def record(self, sde_traj):
-        if self.ptr == 1:
-            # print('record: ', self.ptr)
-            self.lgv1.record(sde_traj)
-        else:
-            # print('record: ', self.ptr)
-            self.lgv2.record(sde_traj)
-
-
-class SDETrajectory(nn.Module):
     def __init__(self):
         super().__init__()
         self.image_data = {}
         self.value_data = {}
+        self._compile = False
 
     def add_image(self, name, images):
+        """
+            Adds image data to the trajectory.
+
+            Parameters:
+                name (str): Name of the image data.
+                images (torch.Tensor): Image tensor to add.
+        """
         if name not in self.image_data:
             self.image_data[name] = []
         self.image_data[name].append(images.detach().cpu())
 
     def add_value(self, name, values):
+        """
+            Adds value data to the trajectory.
+
+            Parameters:
+                name (str): Name of the value data.
+                values (any): Value to add.
+        """
         if name not in self.value_data:
             self.value_data[name] = []
         self.value_data[name].append(values)
 
     def compile(self):
-        for name in self.image_data.keys():
-            self.image_data[name] = torch.stack(self.image_data[name], dim=0)
-        for name in self.value_data.keys():
-            self.value_data[name] = torch.tensor(self.value_data[name])
+        """
+            Compiles the recorded data into tensors.
 
-        # compute tweedie
-        if not 'tweedie' in self.image_data.keys():
-            prior_score = self.image_data['prior_score']
-            xt = self.image_data['xt'][:-1]
-            self.image_data['tweedie'] = xt + prior_score * self.value_data['sigma'].view(-1, 1, 1, 1, 1) ** 2
+            Returns:
+                Trajectory: The compiled trajectory object.
+        """
+        if not self._compile:
+            self._compile = True
+            for name in self.image_data.keys():
+                self.image_data[name] = torch.stack(self.image_data[name], dim=0)
+            for name in self.value_data.keys():
+                self.value_data[name] = torch.tensor(self.value_data[name])
+        return self
+
+    @classmethod
+    def merge(cls, trajs):
+        """
+            Merge a list of compiled trajectories from different batches
+
+            Returns:
+                Trajectory: The merged and compiled trajectory object.
+        """
+        merged_traj = cls()
+        for name in trajs[0].image_data.keys():
+            merged_traj.image_data[name] = torch.cat([traj.image_data[name] for traj in trajs], dim=1)
+        for name in trajs[0].value_data.keys():
+            merged_traj.value_data[name] = trajs[0].value_data[name]
+        return merged_traj

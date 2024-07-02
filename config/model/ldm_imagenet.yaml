@@ -1,3 +1,0 @@
-name: ldm_imagenet
-ldm_config: 'config/model/_ldm_imagenet.yaml'
-diffusion_path: 'checkpoint/ldm_imagenet.pt'

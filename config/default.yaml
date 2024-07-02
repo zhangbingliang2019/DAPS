@@ -1,11 +1,11 @@
 gpu: 0
-batch_size: 20
+batch_size: 10
 num_runs: 4
 save_dir: ./results
 name: demo
 wandb: False
-sub_batch_size: 10
 save_traj: False
 save_samples: True
 show_eval: False
+eval_fn_lists: ['psnr', 'lpips']
 seed: 42

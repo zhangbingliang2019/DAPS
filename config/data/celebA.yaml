@@ -1,5 +1,0 @@
-name: celebA
-root: 'dataset/celebA256'
-resolution: 256
-start_id: 0
-end_id: 100

@@ -1,4 +1,4 @@
-name: 'imagenet256ddpm'
+name: 'ddpm'
 model_config:
   image_size: 256
   num_channels: 256

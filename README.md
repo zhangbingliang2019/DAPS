@@ -1,9 +1,13 @@
 # Decoupled Annealing Posterior Sampling
 
-#### [website](https:) |  [paper](https:)
+#### [website](https:) |  [paper](https://arxiv.org/abs/2407.01521)
 
 (PLACE HOLDER: gifs for method flow and visualization of trajectories)
 
+<p align="center">
+  <img src="README.assets/traj.gif" style="width:100%;" />
+    <img src="README.assets/traj-cap.png" style="width:70%; text-align: center;" />
+</p>
 
 
 ## Results
@@ -78,8 +82,8 @@ python posterior_sample.py \
 +sampler=edm_daps \
 save_dir=results \
 num_runs=4 \
-task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 \
+sampler.diffusion_scheduler_config.num_steps=5 \
+sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=10 \
 data.start_id=0 data.end_id=10 \
 name=phase_retrieval_demo \
@@ -99,12 +103,12 @@ python posterior_sample.py \
 +task={TASK_NAME} \
 +sampler=edm_daps \
 save_dir=results \
-num_runs=1 \
-task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 \
+num_runs=4 \
+sampler.diffusion_scheduler_config.num_steps=5 \
+sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=10 \
 data.start_id=0 data.end_id=10 \
-name={TASK_NAME}_demo \
+name={SUB_FOLDER_NAME} \
 gpu=0
 ```
 
@@ -126,8 +130,14 @@ replace the {TASK_NAME} by one of following:
 
 ## Reference
 
-
-
-
-
-## Acknowledgements
+```
+@misc{zhang2024improvingdiffusioninverseproblem,
+      title={Improving Diffusion Inverse Problem Solving with Decoupled Noise Annealing}, 
+      author={Bingliang Zhang and Wenda Chu and Julius Berner and Chenlin Meng and Anima Anandkumar and Yang Song},
+      year={2024},
+      eprint={2407.01521},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2407.01521}, 
+}
+```
