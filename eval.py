@@ -117,6 +117,90 @@ class Metrics(nn.Module):
         return
 
 
+class Evaluator(nn.Module):
+    """
+        Evaluation module for computing evaluation metrics.
+    """
+
+    def __init__(self, gt, measurement, eval_fn_lists=('psnr', 'lpips')):
+        """
+            Initializes the evaluator with the ground truth and measurement.
+
+            Parameters:
+                gt (torch.Tensor): Ground truth tensor.
+                measurement (torch.Tensor): Measurement tensor.
+                eval_fn_lists (tuple): List of evaluation functions to use.
+        """
+        super().__init__()
+        self.eval_fn = torch.nn.ModuleDict()
+        for eval_fn_name in eval_fn_lists:
+            self.eval_fn.add_module(eval_fn_name, get_eval_fn(eval_fn_name, gt=gt, measurement=measurement))
+        self.main_eval_fn_name = eval_fn_lists[0]
+
+    def forward(self, x, reduction='mean'):
+        """
+            Computes evaluation metrics for the given input.
+
+            Parameters:
+                x (torch.Tensor): Input tensor.
+                reduction (str): Reduction method ('mean' or 'none').
+
+            Returns:
+                dict: Dictionary of evaluation results.
+        """
+        results = {}
+        for eval_fn_name, eval_fn in self.eval_fn.items():
+            if reduction == 'mean':
+                results[eval_fn_name] = eval_fn(x).mean()
+            else:
+                results[eval_fn_name] = eval_fn(x)
+        return results
+
+    def evaluate(self, gt, measurement, x):
+        '''x: [N, B, C, H, W] or [B, C, H, W]'''
+        if len(x.shape) == 4:
+            x = x[None]
+        result_dicts = {}
+
+        # eval function
+        broadcasted_shape = torch.broadcast_shapes(x.shape, gt.shape)
+        x0_flatten = gt.expand(broadcasted_shape).flatten(0, 1)
+        x_flatten = x.expand(broadcasted_shape).flatten(0, 1)
+
+        y_flatten = measurement.expand((broadcasted_shape[0], *measurement.shape[1:])).flatten(0, 1)
+
+        for key, fn in self.eval_fn.items():
+            value = fn.evaluate(x0_flatten, y_flatten, x_flatten)
+            result_dicts[key] = {
+                'sample': self.to_list(value.permute(1, 0)),
+                'mean': self.to_list(value.mean(0)),
+                'std': self.to_list(value.std(0) if value.shape[0] != 1 else torch.zeros_like(value.mean(0))),
+                'max': self.to_list(value.max(0)[0]),
+                'min': self.to_list(value.min(0)[0]),
+            }
+        return result_dicts
+
+    def display(self, result_dicts):
+        table = Table('results')
+        for key in result_dicts.keys():
+            value = ['{:.2f}'.format(v) for v in result_dicts[key][self.cmp_fn[key]]]
+            # print('KEY', key)
+            # print('VALUE', len(value))
+            table.add_column(key, value)
+        # print(table.table)
+        return table.get_string()
+
+    def log_wandb(self, result_dicts, batch_size):
+
+        for s in range(batch_size):
+            log_dict = {key: result_dicts[key][self.cmp_fn[key]][s] for key in result_dicts.keys()}
+            wandb.log(log_dict)
+        log_dict = {key: np.mean(result_dicts[key][self.cmp_fn[key]]) for key in result_dicts.keys()}
+        new_log_dict = {key + '_all': value for key, value in log_dict.items()}
+        wandb.log(new_log_dict)
+        return
+
+
 class Table(object):
     def __init__(self, title=None, field_names=None):
         """
@@ -178,12 +262,21 @@ class EvalFn(torch.nn.Module):
         super().__init__()
         self.gt = gt
         self.measurement = measurement
+        self.start = None
+        self.end = None
 
     def norm(self, x):
         return (x * 0.5 + 0.5).clip(0, 1)
 
+    def set_batch_index(self, start, end):
+        """
+            used before calling forward
+        """
+        self.start = start
+        self.end = end
+
     def forward(self, sample):
-        return self.evaluate(self.gt, self.measurement, sample)
+        return self.evaluate(self.gt[self.start:self.end], self.measurement[self.start:self.end], sample)
 
     def evaluate(self, gt, measurement, sample):
         pass

@@ -1,3 +1,0 @@
-name: 'edm'
-model_config:
-    model_path: 'https://nvlabs-fi-cdn.nvidia.com/edm/pretrained/edm-ffhq-64x64-uncond-ve.pkl'
