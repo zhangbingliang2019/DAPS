@@ -20,7 +20,7 @@ Our approach enables the exploration of a larger solution space, improving the s
 
 - python 3.8
 - PyTorch 2.3
-- CUDA 12.4
+- CUDA 12.1
 
 Lower version of PyTorch with proper CUDA should work but not be fully tested.
 
@@ -33,7 +33,7 @@ conda activate DAPS
 pip install -r requirements.txt
 
 # (optional) install PyTorch with proper CUDA
-conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
