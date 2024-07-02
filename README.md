@@ -31,6 +31,9 @@ conda create -n DAPS python=3.8
 conda activate DAPS
 
 pip install -r requirements.txt
+
+# (optional) install PyTorch with proper CUDA
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
