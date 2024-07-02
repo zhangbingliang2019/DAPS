@@ -101,7 +101,7 @@ python posterior_sample.py \
 +task={TASK_NAME} \
 +sampler=edm_daps \
 save_dir=results \
-num_runs=4 \
+num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=10 \
@@ -128,7 +128,9 @@ replace the {TASK_NAME} by one of following:
 
 ## Customization
 
-We provide a [notebook](scripts/customization.ipynb) for detailed guidance 
+We provide a [notebook](scripts/customization.ipynb)[<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>]("https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/customization.ipynb") for detailed guidance.
+
+
 
 ## Citation
 
