@@ -16,7 +16,13 @@ Our approach enables the exploration of a larger solution space, improving the s
 
 ## Getting started
 
-#### 1. Prepare the Conda environment
+#### 1. Prepare the Environment
+
+- python 3.8
+- PyTorch 2.3
+- CUDA 12.4
+
+Lower version of PyTorch with proper CUDA should work but not be fully tested.
 
 ```
 # in DAPS folder
