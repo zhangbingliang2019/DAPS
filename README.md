@@ -10,11 +10,7 @@ We propose a new method called Decoupled Annealing Posterior Sampling (DAPS) tha
 
 ![img](README.assets/method.png)
 
-Our approach enables the exploration of a larger solution space, improving the success rate for accurate reconstructions. We demonstrate that DAPS significantly improves sample quality and stability across multiple image restoration tasks, particularly in complicated nonlinear inverse problems. For example, we achieve a PSNR of 30.72dB on the FFHQ 256 dataset for phase retrieval, which is an improvement of 9.12dB compared to existing methods.
-
-## Results
-
-(PLACE HOLDER: select and put some results)
+Our approach enables the exploration of a larger solution space, improving the success rate for accurate reconstructions. We demonstrate that DAPS significantly improves sample quality and stability across multiple image restoration tasks, particularly in complicated nonlinear inverse problems. For example, we achieve a PSNR of **30.72**dB on the FFHQ 256 dataset for phase retrieval, which is an improvement of **9.12**dB compared to existing methods.
 
 
 
