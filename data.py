@@ -78,6 +78,7 @@ class ImageDataset(DiffusionData):
     def __len__(self):
         return len(self.data)
 
+
 @register_dataset('empty')
 class Empty(DiffusionData):
     """

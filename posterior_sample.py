@@ -15,90 +15,140 @@ import wandb
 import setproctitle
 from PIL import Image
 import numpy as np
-
-
-def load_yaml(file_path: str) -> dict:
-    with open(file_path) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    return config
-
-
-def norm_01(y):
-    tmp = (y - y.mean()) / y.std()
-    tmp = tmp.clip(-0.5, 0.5) * 3
-    return tmp
+import imageio
 
 
 def resize(y, x, task_name):
-    """[B, C, H, W]"""
+    """
+        Visualization Only: resize measurement y according to original signal image x
+    """
     if y.shape != x.shape:
         ry = interpolate(y, size=x.shape[-2:], mode='bilinear', align_corners=False)
     else:
         ry = y
     if task_name == 'phase_retrieval':
+        def norm_01(y):
+            tmp = (y - y.mean()) / y.std()
+            tmp = tmp.clip(-0.5, 0.5) * 3
+            return tmp
+
         ry = norm_01(ry) * 2 - 1
     return ry
 
 
-# def norm(y):
-#     return (y - y.max(dim=0, keepdims=True)[0]) / (y.max(dim=0, keepdims=True)[0] - y.min(dim=0, keepdims=True)[0])
-
-
 def safe_dir(dir):
+    """
+        get (or create) a directory
+    """
     if not Path(dir).exists():
         Path(dir).mkdir()
     return Path(dir)
 
 
 def norm(x):
+    """
+        normalize data to [0, 1] range
+    """
     return (x * 0.5 + 0.5).clip(0, 1)
 
 
-def to_pil(x):
+def tensor_to_pils(x):
+    """
+        [B, C, H, W] tensor -> list of pil images
+    """
     pils = []
     for x_ in x:
-        pil_x = norm(x_).permute(1, 2, 0).cpu().numpy() * 255
-        pil_x = pil_x.astype(np.uint8)
-        pil_x = Image.fromarray(pil_x)
+        np_x = norm(x_).permute(1, 2, 0).cpu().numpy() * 255
+        np_x = np_x.astype(np.uint8)
+        pil_x = Image.fromarray(np_x)
         pils.append(pil_x)
     return pils
 
+def tensor_to_numpy(x):
+    """
+        [B, C, H, W] tensor -> [B, C, H, W] numpy
+    """
+    np_images = norm(x).permute(0, 2, 3, 1).cpu().numpy() * 255
+    return np_images.astype(np.uint8)
 
-def log_results(args, sde_trajs, results, images, y, full_samples, table_markdown):
+
+def save_mp4_video(y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5, space=4):
+    """
+        stack and save trajectory as mp4 video
+    """
+    writer = imageio.get_writer(output_path, fps=fps, codec='libx264', quality=8)
+    ix, iy = x0hat_traj.shape[-2:]
+    reindex = np.linspace(0, len(xt_traj) - 1, sec * fps).astype(int)
+    np_x0hat_traj = tensor_to_numpy(x0hat_traj[reindex])
+    np_x0y_traj = tensor_to_numpy(x0y_traj[reindex])
+    np_xt_traj = tensor_to_numpy(xt_traj[reindex])
+    np_y = tensor_to_numpy(y[None])[0]
+    for x0hat, x0y, xt in zip(np_x0hat_traj, np_x0y_traj, np_xt_traj):
+        canvas = np.ones((ix, 4 * iy + 4 * space, 3), dtype=np.uint8) * 255
+        cx = cy = 0
+        canvas[cx:cx + ix, cy:cy + iy] = np_y
+
+        cy += iy + 2 * space
+        canvas[cx:cx + ix, cy:cy + iy] = x0y
+
+        cy += iy + space
+        canvas[cx:cx + ix, cy:cy + iy] = x0hat
+
+        cy += iy + space
+        canvas[cx:cx + ix, cy:cy + iy] = xt
+        writer.append_data(canvas)
+    writer.close()
+
+
+def log_results(args, sde_trajs, results, images, y, full_samples, table_markdown, total_number):
+    # log hyperparameters and configurations
     full_samples = full_samples.flatten(0, 1)
     root = safe_dir(Path(args.save_dir) / args.name)
     with open(str(root / 'config.yaml'), 'w') as file:
         yaml.safe_dump(OmegaConf.to_container(args, resolve=True), file, default_flow_style=False, allow_unicode=True)
 
-    stack = torch.cat([images, resize(y, images, args.task.operator.name), full_samples])
-    save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=args.batch_size)
+    # log grid results
+    resized_y = resize(y, images, args.task.operator.name)
+    stack = torch.cat([images, resized_y, full_samples])
+    save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
 
+    # log individual sample instances
     if args.save_samples:
-        pil_image_list = to_pil(full_samples)
+        pil_image_list = tensor_to_pils(full_samples)
         image_dir = safe_dir(root / 'samples')
         cnt = 0
         for run in range(args.num_runs):
-            for idx in range(args.batch_size):
+            for idx in range(total_number):
                 image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx, run)
                 pil_image_list[cnt].save(str(image_path))
                 cnt += 1
 
+    # log sampling trajectory and mp4 video
     if args.save_traj:
+        traj_dir = safe_dir(root / 'trajectory')
         for run, sde_traj in enumerate(sde_trajs):
-            torch.save(sde_traj, str(root / 'trajectory_run{:04d}.pth'.format(run)))
+            if args.save_traj_raw_data:
+                # might be SUPER LARGE
+                traj_raw_data = safe_dir(traj_dir / 'raw')
+                torch.save(sde_traj, str(traj_raw_data / 'trajectory_run{:04d}.pth'.format(run)))
+            # save mp4 video for trajectories
+            x0hat_traj = sde_traj.image_data['x0hat']
+            x0y_traj = sde_traj.image_data['x0y']
+            xt_traj = sde_traj.image_data['xt']
+            for idx in range(total_number):
+                video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
+                save_mp4_video(resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
 
+    # log the evaluation metrics
     with open(str(root / 'eval.md'), 'w') as file:
         file.write(table_markdown)
-
     json.dump(results, open(str(root / 'metrics.json'), 'w'), indent=4)
 
 
-def visualize_grid(args, images, name='debug.png'):
-    root = Path(args.save_dir) / args.name
-    save_image(images * 0.5 + 0.5, fp=str(root / name), nrow=args.batch_size)
-
-
 def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size):
+    """
+        posterior sampling in batch
+    """
     samples = []
     trajs = []
     for s in range(0, len(x_start), batch_size):
@@ -165,7 +215,7 @@ def main(args):
     print(markdown_text)
 
     # log results
-    log_results(args, full_trajs, results, images, y, full_samples, markdown_text)
+    log_results(args, full_trajs, results, images, y, full_samples, markdown_text, total_number)
     if args.wandb:
         wandb.init(
             project=args.project_name,

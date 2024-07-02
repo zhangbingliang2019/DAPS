@@ -26,6 +26,12 @@ class Evaluator(nn.Module):
             self.eval_fn.add_module(eval_fn_name, get_eval_fn(eval_fn_name, gt=gt, measurement=measurement))
         self.main_eval_fn_name = eval_fn_lists[0]
 
+    def get_main_eval_fn(self):
+        """
+            return the first eval_fn by default
+        """
+        return self.eval_fn[self.main_eval_fn_name]
+
     def forward(self, x, reduction='mean'):
         """
             Computes evaluation metrics for the given input.
@@ -135,9 +141,9 @@ class Table(object):
         pass
 
 
-
 __EVAL_FN__ = {}
 __EVAL_FN_CMP__ = {}
+
 
 def register_eval_fn(name: str):
     def wrapper(cls):
@@ -187,9 +193,11 @@ class EvalFn(torch.nn.Module):
     def evaluate(self, gt, measurement, sample):
         pass
 
+
 @register_eval_fn('psnr')
 class PeakSignalNoiseRatio(EvalFn):
     cmp = 'max'  # the higher, the better
+
     def evaluate(self, gt, measurement, sample):
         return psnr(self.norm(gt), self.norm(sample), 1.0, reduction='none')
 
@@ -197,15 +205,18 @@ class PeakSignalNoiseRatio(EvalFn):
 @register_eval_fn('ssim')
 class StructuralSimilarityIndexMeasure(EvalFn):
     cmp = 'max'  # the higher, the better
+
     def evaluate(self, gt, measurement, sample):
         return ssim(self.norm(gt), self.norm(sample), 1.0, reduction='none')
+
 
 @register_eval_fn('lpips')
 class LearnedPerceptualImagePatchSimilarity(EvalFn):
     cmp = 'min'  # the higher, the better
+
     def __init__(self, gt, measurement):
         super().__init__(gt, measurement)
         self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
+
     def evaluate(self, gt, measurement, sample):
         return self.lpips_fn(self.norm(gt), self.norm(sample))
-

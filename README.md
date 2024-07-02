@@ -1,14 +1,12 @@
 # Decoupled Annealing Posterior Sampling
 
-#### [website](https:) |  [paper](https://arxiv.org/abs/2407.01521)
-
-(PLACE HOLDER: gifs for method flow and visualization of trajectories)
+#### [website](https://daps-inverse-problem.github.io/) |  [paper](https://arxiv.org/abs/2407.01521)
 
 <p align="center">
   <img src="README.assets/traj.gif" style="width:100%;" />
     <img src="README.assets/traj-cap.png" style="width:70%; text-align: center;" />
 </p>
-
+<video src="/Users/bingliangzhang/Downloads/traj.mp4"></video>
 
 ## Results
 
@@ -21,10 +19,10 @@
 #### 1. Prepare the Conda environment
 
 ```
-# in daps folder
+# in DAPS folder
 
-conda create -n daps python=3.8
-conda activate daps
+conda create -n DAPS python=3.8
+conda activate DAPS
 
 pip install -r requirements.txt
 ```
@@ -38,7 +36,7 @@ We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for 
 Download the public available FFHQ checkpoint (ffhq_10m.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
 
 ```
-# in daps folder
+# in DAPS folder
 
 mkdir checkpoint
 mv {DOWNLOAD_DIR}/ffqh_10m.pt checkpoint/ffhq256.pt
@@ -49,7 +47,7 @@ mv {DOWNLOAD_DIR}/ffqh_10m.pt checkpoint/ffhq256.pt
 **(Optional)** For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
 
 ```
-# in daps folder
+# in DAPS folder
 
 mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
 ```

@@ -4,8 +4,9 @@ num_runs: 4
 save_dir: ./results
 name: demo
 wandb: False
-save_traj: False
 save_samples: True
+save_traj: False
+save_traj_raw_data: False
 show_eval: False
 eval_fn_lists: ['psnr', 'lpips']
 seed: 42
