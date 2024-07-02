@@ -1,6 +1,6 @@
 # Decoupled Annealing Posterior Sampling
 
-#### [website](https:) |  [paper](https:)
+#### [website](https:) |  [paper](https://arxiv.org/abs/2407.01521)
 
 (PLACE HOLDER: gifs for method flow and visualization of trajectories)
 

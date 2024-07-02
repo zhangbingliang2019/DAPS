@@ -79,13 +79,13 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
         cnt = 0
         for run in range(args.num_runs):
             for idx in range(args.batch_size):
-                image_path = image_dir / '{:05d}_r{:02d}.png'.format(idx, run)
+                image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx, run)
                 pil_image_list[cnt].save(str(image_path))
                 cnt += 1
 
     if args.save_traj:
-        for seed, sde_traj in enumerate(sde_trajs):
-            torch.save(sde_traj, str(root / 'sde_traj_seed{}.pth'.format(seed)))
+        for run, sde_traj in enumerate(sde_trajs):
+            torch.save(sde_traj, str(root / 'trajectory_run{:04d}.pth'.format(run)))
 
     with open(str(root / 'eval.md'), 'w') as file:
         file.write(table_markdown)
@@ -118,10 +118,14 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
 @hydra.main(version_base='1.3', config_path='config', config_name='default.yaml')
 def main(args):
     # fix random seed
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    setproctitle.setproctitle(args.name)
+    torch.backends.cudnn.deterministic = True
     torch.cuda.set_device('cuda:{}'.format(args.gpu))
+
+    setproctitle.setproctitle(args.name)
     print(args)
 
     # get data
@@ -158,7 +162,6 @@ def main(args):
     # log metrics
     results = evaluator.evaluate(images, y, full_samples)
     markdown_text = evaluator.display(results)
-
     print(markdown_text)
 
     # log results

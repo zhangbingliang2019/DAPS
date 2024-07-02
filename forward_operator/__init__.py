@@ -30,7 +30,7 @@ def get_operator(name: str, **kwargs):
 
 
 class Operator(ABC):
-    def __init__(self, sigma=0.701):
+    def __init__(self, sigma=0.05):
         self.sigma = sigma
 
     @abstractmethod
@@ -54,7 +54,7 @@ class Operator(ABC):
 # Linear Operator
 @register_operator(name='down_sampling')
 class DownSampling(Operator):
-    def __init__(self, resolution=256, scale_factor=4, device='cuda', sigma=0.701):
+    def __init__(self, resolution=256, scale_factor=4, device='cuda', sigma=0.05):
         super().__init__(sigma)
         in_shape = [1, 3, resolution, resolution]
         self.down_sample = Resizer(in_shape, 1 / scale_factor).to(device)
@@ -140,7 +140,7 @@ class mask_generator:
 @register_operator(name='inpainting')
 class Inpainting(Operator):
     def __init__(self, mask_type, mask_len_range=None, mask_prob_range=None, resolution=256, device='cuda',
-                 sigma=0.701):
+                 sigma=0.05):
         super().__init__(sigma)
         self.mask_gen = mask_generator(mask_type, mask_len_range, mask_prob_range, resolution)
         self.mask = None  # [B, 1, H, W]
@@ -197,7 +197,7 @@ class Blurkernel(nn.Module):
 
 @register_operator(name='gaussian_blur')
 class GaussianBlur(Operator):
-    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.701):
+    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.kernel_size = kernel_size
@@ -215,7 +215,7 @@ class GaussianBlur(Operator):
 
 @register_operator(name='motion_blur')
 class MotionBlur(Operator):
-    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.701):
+    def __init__(self, kernel_size, intensity, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.kernel_size = kernel_size
@@ -237,7 +237,7 @@ class MotionBlur(Operator):
 # Non-linear Operator
 @register_operator(name='phase_retrieval')
 class PhaseRetrieval(Operator):
-    def __init__(self, oversample=0.0, resolution=256, sigma=0.701):
+    def __init__(self, oversample=0.0, resolution=256, sigma=0.05):
         super().__init__(sigma)
         self.pad = int((oversample / 8.0) * resolution)
 
@@ -254,7 +254,7 @@ class PhaseRetrieval(Operator):
 
 @register_operator(name='nonlinear_blur')
 class NonlinearBlur(Operator):
-    def __init__(self, opt_yml_path, device='cuda', sigma=0.701):
+    def __init__(self, opt_yml_path, device='cuda', sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.blur_model = self.prepare_nonlinear_blur_model(opt_yml_path)
@@ -307,7 +307,7 @@ class NonlinearBlur(Operator):
 
 @register_operator(name='high_dynamic_range')
 class HighDynamicRange(Operator):
-    def __init__(self, device='cuda', scale=2, sigma=0.701):
+    def __init__(self, device='cuda', scale=2, sigma=0.05):
         super().__init__(sigma)
         self.device = device
         self.scale = scale
