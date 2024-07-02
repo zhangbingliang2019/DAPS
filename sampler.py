@@ -335,7 +335,8 @@ class DAPS(nn.Module):
             # 1. reverse diffusion
             diffusion_scheduler = Scheduler(**self.diffusion_scheduler_config, sigma_max=sigma)
             sampler = DiffusionSampler(diffusion_scheduler)
-            x0hat = sampler.sample(model, xt, SDE=False, verbose=False)
+            with torch.no_grad():
+                x0hat = sampler.sample(model, xt, SDE=False, verbose=False)
 
             # 2. langevin dynamics
             x0y = self.lgvd.sample(x0hat, operator, measurement, sigma, step / self.annealing_scheduler.num_steps)

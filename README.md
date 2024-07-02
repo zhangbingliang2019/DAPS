@@ -130,8 +130,14 @@ replace the {TASK_NAME} by one of following:
 
 ## Reference
 
-
-
-
-
-## Acknowledgements
+```
+@misc{zhang2024improvingdiffusioninverseproblem,
+      title={Improving Diffusion Inverse Problem Solving with Decoupled Noise Annealing}, 
+      author={Bingliang Zhang and Wenda Chu and Julius Berner and Chenlin Meng and Anima Anandkumar and Yang Song},
+      year={2024},
+      eprint={2407.01521},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2407.01521}, 
+}
+```
