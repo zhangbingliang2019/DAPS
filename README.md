@@ -82,8 +82,8 @@ python posterior_sample.py \
 +sampler=edm_daps \
 save_dir=results \
 num_runs=4 \
-task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 \
+sampler.diffusion_scheduler_config.num_steps=5 \
+sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=10 \
 data.start_id=0 data.end_id=10 \
 name=phase_retrieval_demo \
@@ -103,12 +103,12 @@ python posterior_sample.py \
 +task={TASK_NAME} \
 +sampler=edm_daps \
 save_dir=results \
-num_runs=1 \
-task.likelihood_estimator_config.ode_step=5 \
-sampler.num_steps=200 \
+num_runs=4 \
+sampler.diffusion_scheduler_config.num_steps=5 \
+sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=10 \
 data.start_id=0 data.end_id=10 \
-name={TASK_NAME}_demo \
+name={SUB_FOLDER_NAME} \
 gpu=0
 ```
 

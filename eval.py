@@ -156,6 +156,11 @@ class Evaluator(nn.Module):
                 results[eval_fn_name] = eval_fn(x)
         return results
 
+    def set_batch_index(self, start, end):
+        for eval_fn in self.eval_fn.values():
+            eval_fn.set_batch_index(start, end)
+
+
     def evaluate(self, gt, measurement, x):
         '''x: [N, B, C, H, W] or [B, C, H, W]'''
         if len(x.shape) == 4:
@@ -184,10 +189,7 @@ class Evaluator(nn.Module):
         table = Table('results')
         for key in result_dicts.keys():
             value = ['{:.2f}'.format(v) for v in result_dicts[key][self.cmp_fn[key]]]
-            # print('KEY', key)
-            # print('VALUE', len(value))
             table.add_column(key, value)
-        # print(table.table)
         return table.get_string()
 
     def log_wandb(self, result_dicts, batch_size):
@@ -276,6 +278,9 @@ class EvalFn(torch.nn.Module):
         self.end = end
 
     def forward(self, sample):
+        """
+            calling before setting correct batch index
+        """
         return self.evaluate(self.gt[self.start:self.end], self.measurement[self.start:self.end], sample)
 
     def evaluate(self, gt, measurement, sample):
