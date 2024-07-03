@@ -137,7 +137,18 @@ replace the {TASK_NAME} by one of following:
 
 * `hdr`: high dynamic range reconstruction of factor $2$ 
 
-  
+
+
+
+## Customization
+
+DAPS
+
+We provide a [notebook](scripts/customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/customization.ipynb).
+
+
+
+
 
 ## Citation
 
