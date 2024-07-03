@@ -16,7 +16,7 @@ def register_model(name: str):
     def wrapper(cls):
         if __MODEL__.get(name, None):
             if __MODEL__[name] != cls:
-                raise NameError(f"Name {name} is already registered!")
+                raise Warning(f"Name {name} is already registered!")
         __MODEL__[name] = cls
         cls.name = name
         return cls

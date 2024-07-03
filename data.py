@@ -12,7 +12,7 @@ def register_dataset(name: str):
     def wrapper(cls):
         if __DATASET__.get(name, None):
             if __DATASET__[name] != cls:
-                raise NameError(f"Name {name} is already registered!")
+                raise Warning(f"Name {name} is already registered!")
         __DATASET__[name] = cls
         cls.name = name
         return cls
