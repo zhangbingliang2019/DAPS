@@ -351,9 +351,10 @@ class DAPS(nn.Module):
             # 4. evaluation
             x0hat_results = x0y_results = None
             if evaluator and 'gt' in kwargs:
-                gt = kwargs['gt']
-                x0hat_results = evaluator(gt, measurement, x0hat)
-                x0y_results = evaluator(gt, measurement, x0y)
+                with torch.no_grad():
+                    gt = kwargs['gt']
+                    x0hat_results = evaluator(gt, measurement, x0hat)
+                    x0y_results = evaluator(gt, measurement, x0y)
 
                 # record
                 if verbose:
