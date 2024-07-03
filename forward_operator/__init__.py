@@ -16,10 +16,11 @@ __OPERATOR__ = {}
 def register_operator(name: str):
     def wrapper(cls):
         if __OPERATOR__.get(name, None):
-            raise NameError(f"Name {name} is already registered!")
+            if __OPERATOR__[name] != cls:
+                raise NameError(f"Name {name} is already registered!")
         __OPERATOR__[name] = cls
+        cls.name = name
         return cls
-
     return wrapper
 
 

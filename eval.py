@@ -139,7 +139,8 @@ __EVAL_FN_CMP__ = {}
 def register_eval_fn(name: str):
     def wrapper(cls):
         if __EVAL_FN__.get(name, None):
-            raise NameError(f"Name {name} is already registered!")
+            if __EVAL_FN__[name] != cls:
+                raise NameError(f"Name {name} is already registered!")
         __EVAL_FN__[name] = cls
         __EVAL_FN_CMP__[name] = cls.cmp
         cls.name = name
