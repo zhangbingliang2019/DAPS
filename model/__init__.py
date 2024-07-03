@@ -28,32 +28,42 @@ def get_model(name: str, **kwargs):
     return __MODEL__[name](**kwargs)
 
 
-
-
 class DiffusionModel(nn.Module):
     """
     A class representing a diffusion model.
     Methods:
-        score(x, sigma): Calculates the score of the diffusion model given the input `x` and standard deviation `sigma`.
-        tweedie(x, sigma): Calculates the Tweedie distribution given the input `x` and standard deviation `sigma`.
-        Must overload either `score` or `tweedie` method.
+        score(x, sigma): Calculates the score function of time-varying noisy distribution:
+
+                \nabla_{x_t}\log p(x_t;\sigma_t)
+
+        tweedie(x, sigma): Calculates the expectation of clean data (x0) given noisy data (xt):
+
+             \mathbb{E}_{x_0 \sim p(x_0 \mid x_t)}[x_0 \mid x_t]
     """
 
     def __init__(self):
         super(DiffusionModel, self).__init__()
         # Check if either `score` or `tweedie` is overridden
         if (self.score.__func__ is DiffusionModel.score and
-            self.tweedie.__func__ is DiffusionModel.tweedie):
+                self.tweedie.__func__ is DiffusionModel.tweedie):
             raise NotImplementedError(
                 "Either `score` or `tweedie` method must be implemented."
             )
 
     def score(self, x, sigma):
+        """
+            x       : noisy state at time t, torch.Tensor([B, *data.shape])
+            sigma   : noise level at time t, scaler
+        """
         d = self.tweedie(x, sigma)
         return (d - x) / sigma ** 2
 
     def tweedie(self, x, sigma):
-        return x + self.score(x, sigma) * sigma**2
+        """
+            x       : noisy state at time t, torch.Tensor([B, *data.shape])
+            sigma   : noise level at time t, scaler
+        """
+        return x + self.score(x, sigma) * sigma ** 2
 
 
 class LatentDiffusionModel(nn.Module):
@@ -65,16 +75,17 @@ class LatentDiffusionModel(nn.Module):
         score(z, sigma): Calculates the score of the latent diffusion model given the latent variable `z` and standard deviation `sigma`.
         tweedie(z, sigma): Calculates the Tweedie distribution given the latent variable `z` and standard deviation `sigma`.
         Must overload either `score` or `tweedie` method.
-    """ 
+    """
+
     def __init__(self):
         super(LatentDiffusionModel, self).__init__()
         # Check if either `score` or `tweedie` is overridden
         if (self.score.__func__ is LatentDiffusionModel.score and
-            self.tweedie.__func__ is LatentDiffusionModel.tweedie):
+                self.tweedie.__func__ is LatentDiffusionModel.tweedie):
             raise NotImplementedError(
                 "Either `score` or `tweedie` method must be implemented."
             )
-    
+
     @abstractmethod
     def encode(self, x0):
         pass
@@ -88,7 +99,8 @@ class LatentDiffusionModel(nn.Module):
         return (d - z) / sigma ** 2
 
     def tweedie(self, z, sigma):
-        return z + self.score(z, sigma) * sigma**2
+        return z + self.score(z, sigma) * sigma ** 2
+
 
 @register_model(name='ddpm')
 class DDPM(DiffusionModel):
@@ -104,7 +116,8 @@ class DDPM(DiffusionModel):
 
     def __init__(self, model_config, device='cuda'):
         super().__init__()
-        self.model = VPPrecond(model=create_model(**model_config),learn_sigma=model_config['learn_sigma'],conditional=model_config['class_cond']).to(device)
+        self.model = VPPrecond(model=create_model(**model_config), learn_sigma=model_config['learn_sigma'],
+                               conditional=model_config['class_cond']).to(device)
         self.model.eval()
 
     def tweedie(self, x, sigma=2e-3):
@@ -119,7 +132,7 @@ class EDM(DiffusionModel):
 
     def __init__(self, model_config, device='cuda'):
         super().__init__()
-        self.model = self.load_pretrained_model(model_config['model_path'],device=device)
+        self.model = self.load_pretrained_model(model_config['model_path'], device=device)
 
     def load_pretrained_model(self, url, device='cuda'):
         with dnnlib.util.open_url(url) as f:
@@ -136,6 +149,7 @@ class LatentDDPM(LatentDiffusionModel):
     """
     Latent Diffusion Models (High-Resolution Image Synthesis with Latent Diffusion Models).
     """
+
     def __init__(self, ldm_config, diffusion_path, device='cuda'):
         super().__init__()
         config = OmegaConf.load(ldm_config)
@@ -151,8 +165,6 @@ class LatentDDPM(LatentDiffusionModel):
 
     def tweedie(self, x, sigma=2e-3):
         return self.model(x, torch.as_tensor(sigma).to(x.device))
-
-
 
 
 def get_obj_from_str(string, reload=False):

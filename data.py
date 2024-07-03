@@ -3,6 +3,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import torch
 from pathlib import Path
+from torch.utils.data import Dataset
 
 __DATASET__ = {}
 
@@ -23,14 +24,22 @@ def get_dataset(name: str, **kwargs):
     return __DATASET__[name](**kwargs)
 
 
-class DiffusionData(ABC):
+class DiffusionData(ABC, Dataset):
     @abstractmethod
     def get_shape(self):
         pass
 
     @abstractmethod
-    def get_data(self, size=16, sigma=2e-3):
+    def __getitem__(self, item):
         pass
+
+    @abstractmethod
+    def __len__(self):
+        pass
+
+    def get_data(self, size=16, sigma=2e-3):
+        data = torch.stack([self.__getitem__(i) for i in range(size)], dim=0)
+        return data + torch.randn_like(data) * sigma
 
     def get_random(self, size=16, sigma=2e-3):
         shape = (size, *self.get_shape())
@@ -65,15 +74,11 @@ class ImageDataset(DiffusionData):
         self.res = resolution
         self.device = device
 
-    def load_data(self, i):
+    def __getitem__(self, i):
         return (self.trans(Image.open(self.data[i])) * 2 - 1).to(self.device)
 
     def get_shape(self):
         return (3, self.res, self.res)
-
-    def get_data(self, size=16, sigma=2e-3):
-        data = torch.stack([self.load_data(i) for i in range(size)], dim=0)
-        return data + torch.randn_like(data) * sigma
 
     def __len__(self):
         return len(self.data)
@@ -91,15 +96,11 @@ class Empty(DiffusionData):
         self.shape = shape
         self.device = device
 
-    def load_data(self, i):
+    def __getitem__(self, i):
         return torch.zeros(self.shape).cuda()
 
     def get_shape(self):
         return self.shape
-
-    def get_data(self, size=16, sigma=2e-3):
-        data = torch.stack([self.load_data(i) for i in range(size)], dim=0)
-        return data + torch.randn_like(data) * sigma
 
     def __len__(self):
         return 1
