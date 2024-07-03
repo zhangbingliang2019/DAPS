@@ -254,7 +254,6 @@ class LangevinDynamics(nn.Module):
             self.trajectory = Trajectory()
         pbar = tqdm.trange(self.num_steps) if verbose else range(self.num_steps)
         lr = self.get_lr(ratio)
-        x0hat = x0hat.requires_grad_(False).detach()
         x = x0hat.clone().detach().requires_grad_(True)
         optimizer = torch.optim.SGD([x], lr)
         for _ in pbar:
