@@ -116,11 +116,12 @@ class DDPM(DiffusionModel):
         tweedie(self, x, sigma=2e-3): Applies the DDPM model to denoise the input, using VP preconditioning from EDM.
     """
 
-    def __init__(self, model_config, device='cuda'):
+    def __init__(self, model_config, device='cuda', requires_grad=False):
         super().__init__()
         self.model = VPPrecond(model=create_model(**model_config), learn_sigma=model_config['learn_sigma'],
                                conditional=model_config['class_cond']).to(device)
         self.model.eval()
+        self.model.requires_grad_(requires_grad)
 
     def tweedie(self, x, sigma=2e-3):
         return self.model(x, torch.as_tensor(sigma).to(x.device))
@@ -132,9 +133,12 @@ class EDM(DiffusionModel):
     Diffusion models from EDM (Elucidating the Design Space of Diffusion-Based Generative Models).
     """
 
-    def __init__(self, model_config, device='cuda'):
+    def __init__(self, model_config, device='cuda', requires_grad=False):
         super().__init__()
         self.model = self.load_pretrained_model(model_config['model_path'], device=device)
+
+        self.model.eval()
+        self.model.requires_grad_(requires_grad)
 
     def load_pretrained_model(self, url, device='cuda'):
         with dnnlib.util.open_url(url) as f:
@@ -152,12 +156,14 @@ class LatentDDPM(LatentDiffusionModel):
     Latent Diffusion Models (High-Resolution Image Synthesis with Latent Diffusion Models).
     """
 
-    def __init__(self, ldm_config, diffusion_path, device='cuda'):
+    def __init__(self, ldm_config, diffusion_path, device='cuda', requires_grad=False):
         super().__init__()
         config = OmegaConf.load(ldm_config)
         net = LDM(load_model_from_config(config, diffusion_path)).to(device)
         self.model = VPPrecond(model=net).to(device)
-        self.model.requires_grad_(False)
+
+        self.model.eval()
+        self.model.requires_grad_(requires_grad)
 
     def encode(self, x0):
         return self.model.model.encode(x0)
