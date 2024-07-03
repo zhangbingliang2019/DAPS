@@ -14,6 +14,12 @@ Our approach enables the exploration of a larger solution space, improving the s
 
 
 
+## Customizing DAPS for New Inverse Problems
+
+We provide a [notebook](scripts/customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb).
+
+
+
 ## Getting started
 
 #### 1. Prepare the Environment
@@ -136,13 +142,6 @@ replace the {TASK_NAME} by one of following:
 * `nonlinear_blur`: nonlinear deblur of default setting in bkse repo
 
 * `hdr`: high dynamic range reconstruction of factor $2$ 
-
-
-
-
-## Customizing DAPS for New Inverse Problems
-
-We provide a [notebook](scripts/customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb).
 
 
 
