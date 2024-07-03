@@ -4,6 +4,8 @@ import torchvision.transforms as transforms
 import torch
 from pathlib import Path
 from torch.utils.data import Dataset
+import warnings
+
 
 __DATASET__ = {}
 
@@ -12,7 +14,7 @@ def register_dataset(name: str):
     def wrapper(cls):
         if __DATASET__.get(name, None):
             if __DATASET__[name] != cls:
-                raise Warning(f"Name {name} is already registered!")
+                warnings.warn(f"Name {name} is already registered!", UserWarning)
         __DATASET__[name] = cls
         cls.name = name
         return cls

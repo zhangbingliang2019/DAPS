@@ -8,6 +8,7 @@ import importlib
 from abc import abstractmethod
 from .precond import VPPrecond, LDM
 import sys
+import warnings
 
 __MODEL__ = {}
 
@@ -16,7 +17,7 @@ def register_model(name: str):
     def wrapper(cls):
         if __MODEL__.get(name, None):
             if __MODEL__[name] != cls:
-                raise Warning(f"Name {name} is already registered!")
+                warnings.warn(f"Name {name} is already registered!", UserWarning)
         __MODEL__[name] = cls
         cls.name = name
         return cls

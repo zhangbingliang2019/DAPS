@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import wandb
 import numpy as np
+import warnings
 
 
 class Evaluator(nn.Module):
@@ -140,7 +141,7 @@ def register_eval_fn(name: str):
     def wrapper(cls):
         if __EVAL_FN__.get(name, None):
             if __EVAL_FN__[name] != cls:
-                raise Warning(f"Name {name} is already registered!")
+                warnings.warn(f"Name {name} is already registered!", UserWarning)
         __EVAL_FN__[name] = cls
         __EVAL_FN_CMP__[name] = cls.cmp
         cls.name = name

@@ -9,6 +9,7 @@ import torch.nn as nn
 import scipy
 import numpy as np
 import yaml
+import warnings
 
 __OPERATOR__ = {}
 
@@ -17,7 +18,7 @@ def register_operator(name: str):
     def wrapper(cls):
         if __OPERATOR__.get(name, None):
             if __OPERATOR__[name] != cls:
-                raise Warning(f"Name {name} is already registered!")
+                warnings.warn(f"Name {name} is already registered!", UserWarning)
         __OPERATOR__[name] = cls
         cls.name = name
         return cls
