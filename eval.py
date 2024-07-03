@@ -64,7 +64,7 @@ class Evaluator:
         y_flatten = measurement.expand((broadcasted_shape[0], *measurement.shape)).flatten(0, 1)
 
         for key, fn in self.eval_fn.items():
-            value = fn.evaluate(x0_flatten, y_flatten, x_flatten).reshape(broadcasted_shape[0], -1)
+            value = fn(x0_flatten, y_flatten, x_flatten, reduction='none').reshape(broadcasted_shape[0], -1)
             result_dicts[key] = {
                 'sample': self.to_list(value.permute(1, 0)),
                 'mean': self.to_list(value.mean(0)),
