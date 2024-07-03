@@ -314,7 +314,7 @@ class DAPS(nn.Module):
         self.diffusion_scheduler_config = diffusion_scheduler_config
         self.lgvd = LangevinDynamics(**lgvd_config)
 
-    def sample(self, model, x_start, operator, measurement, evaluator=None, record=False, verbose=False):
+    def sample(self, model, x_start, operator, measurement, evaluator=None, record=False, verbose=False, **kwargs):
         """
             Samples using the DAPS method.
 
@@ -326,6 +326,8 @@ class DAPS(nn.Module):
                 evaluator (Evaluator): Evaluation function.
                 record (bool): Whether to record the trajectory.
                 verbose (bool): Whether to display progress bar.
+                **kwargs:
+                    gt (torch.Tensor): reference ground truth data, only for evaluation
 
             Returns:
                 torch.Tensor: The final sampled state.
@@ -350,9 +352,10 @@ class DAPS(nn.Module):
 
             # 4. evaluation
             x0hat_results = x0y_results = None
-            if evaluator:
-                x0hat_results = evaluator(x0hat)
-                x0y_results = evaluator(x0y)
+            if evaluator and 'gt' in kwargs:
+                gt = kwargs['gt']
+                x0hat_results = evaluator(gt, measurement, x0hat)
+                x0y_results = evaluator(gt, measurement, x0y)
 
                 # record
                 if verbose:

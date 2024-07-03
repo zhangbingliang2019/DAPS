@@ -11,20 +11,18 @@ class Evaluator(nn.Module):
         Evaluation module for computing evaluation metrics.
     """
 
-    def __init__(self, gt, measurement, eval_fn_lists=('psnr', 'lpips')):
+    def __init__(self, eval_fn_list):
         """
             Initializes the evaluator with the ground truth and measurement.
 
             Parameters:
-                gt (torch.Tensor): Ground truth tensor.
-                measurement (torch.Tensor): Measurement tensor.
-                eval_fn_lists (tuple): List of evaluation functions to use.
+                eval_fn_list (tuple): List of evaluation functions to use.
         """
         super().__init__()
         self.eval_fn = torch.nn.ModuleDict()
-        for eval_fn_name in eval_fn_lists:
-            self.eval_fn.add_module(eval_fn_name, get_eval_fn(eval_fn_name, gt=gt, measurement=measurement))
-        self.main_eval_fn_name = eval_fn_lists[0]
+        for eval_fn in eval_fn_list:
+            self.eval_fn.add_module(eval_fn.name, eval_fn)
+        self.main_eval_fn_name = eval_fn_list[0].name
 
     def get_main_eval_fn(self):
         """
@@ -32,7 +30,7 @@ class Evaluator(nn.Module):
         """
         return self.eval_fn[self.main_eval_fn_name]
 
-    def forward(self, x, reduction='mean'):
+    def forward(self, gt, measurement, x, reduction='mean'):
         """
             Computes evaluation metrics for the given input.
 
@@ -45,20 +43,13 @@ class Evaluator(nn.Module):
         """
         results = {}
         for eval_fn_name, eval_fn in self.eval_fn.items():
-            if reduction == 'mean':
-                results[eval_fn_name] = eval_fn(x).mean()
-            else:
-                results[eval_fn_name] = eval_fn(x)
+            results[eval_fn_name] = eval_fn(gt, measurement, x, reduction)
         return results
-
-    def set_batch_index(self, start, end):
-        for eval_fn in self.eval_fn.values():
-            eval_fn.set_batch_index(start, end)
 
     def to_list(self, x):
         return x.cpu().detach().tolist()
 
-    def evaluate(self, gt, measurement, x):
+    def report(self, gt, measurement, x):
         '''x: [N, B, C, H, W] or [B, C, H, W]'''
         if len(x.shape) == 4:
             x = x[None]
@@ -151,6 +142,7 @@ def register_eval_fn(name: str):
             raise NameError(f"Name {name} is already registered!")
         __EVAL_FN__[name] = cls
         __EVAL_FN_CMP__[name] = cls.cmp
+        cls.name = name
         return cls
 
     return wrapper
@@ -167,30 +159,10 @@ def get_eval_fn_cmp(name: str):
 
 
 class EvalFn(torch.nn.Module):
-    def __init__(self, gt, measurement):
-        super().__init__()
-        self.gt = gt
-        self.measurement = measurement
-        self.start = None
-        self.end = None
-
     def norm(self, x):
         return (x * 0.5 + 0.5).clip(0, 1)
 
-    def set_batch_index(self, start, end):
-        """
-            used before calling forward
-        """
-        self.start = start
-        self.end = end
-
-    def forward(self, sample):
-        """
-            calling before setting correct batch index
-        """
-        return self.evaluate(self.gt[self.start:self.end], self.measurement[self.start:self.end], sample)
-
-    def evaluate(self, gt, measurement, sample):
+    def forward(self, gt, measurement, sample, reduction='none'):
         pass
 
 
@@ -198,25 +170,28 @@ class EvalFn(torch.nn.Module):
 class PeakSignalNoiseRatio(EvalFn):
     cmp = 'max'  # the higher, the better
 
-    def evaluate(self, gt, measurement, sample):
-        return psnr(self.norm(gt), self.norm(sample), 1.0, reduction='none')
+    def forward(self, gt, measurement, sample, reduction='none'):
+        return psnr(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
 
 
 @register_eval_fn('ssim')
 class StructuralSimilarityIndexMeasure(EvalFn):
     cmp = 'max'  # the higher, the better
 
-    def evaluate(self, gt, measurement, sample):
-        return ssim(self.norm(gt), self.norm(sample), 1.0, reduction='none')
+    def forward(self, gt, measurement, sample, reduction='none'):
+        return ssim(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
 
 
 @register_eval_fn('lpips')
 class LearnedPerceptualImagePatchSimilarity(EvalFn):
     cmp = 'min'  # the higher, the better
 
-    def __init__(self, gt, measurement):
-        super().__init__(gt, measurement)
+    def __init__(self):
+        super().__init__()
         self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
 
-    def evaluate(self, gt, measurement, sample):
-        return self.lpips_fn(self.norm(gt), self.norm(sample))
+    def forward(self, gt, measurement, sample, reduction='none'):
+        res = self.lpips_fn(self.norm(gt), self.norm(sample))
+        if reduction == 'mean':
+            res = res.mean()
+        return res

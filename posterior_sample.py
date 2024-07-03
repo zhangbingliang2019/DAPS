@@ -6,7 +6,7 @@ from forward_operator import get_operator
 from data import get_dataset
 from sampler import get_sampler, Trajectory
 from model import get_model
-from eval import Evaluator
+from eval import get_eval_fn, Evaluator
 from torch.nn.functional import interpolate
 from pathlib import Path
 from omegaconf import OmegaConf
@@ -147,7 +147,7 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
     json.dump(results, open(str(root / 'metrics.json'), 'w'), indent=4)
 
 
-def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size):
+def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt):
     """
         posterior sampling in batch
     """
@@ -155,10 +155,11 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
     trajs = []
     for s in range(0, len(x_start), batch_size):
         # update evaluator to correct batch index
-        evaluator.set_batch_index(s, s + batch_size)
         cur_x_start = x_start[s:s + batch_size]
         cur_y = y[s:s + batch_size]
-        cur_samples = sampler.sample(model, cur_x_start, operator, cur_y, evaluator, verbose=verbose, record=record)
+        cur_gt = gt[s: s + batch_size]
+        cur_samples = sampler.sample(model, cur_x_start, operator, cur_y, evaluator, verbose=verbose, record=record, gt=cur_gt)
+
         samples.append(cur_samples)
         if record:
             trajs.append(sampler.trajectory.compile())
@@ -196,7 +197,10 @@ def main(args):
     model = get_model(**args.model)
 
     # get evaluator
-    evaluator = Evaluator(images, y, eval_fn_lists=args.eval_fn_lists)
+    eval_fn_list = []
+    for eval_fn_name in args.eval_fn_list:
+        eval_fn_list.append(get_eval_fn(eval_fn_name))
+    evaluator = Evaluator(eval_fn_list)
 
     # +++++++++++++++++++++++++++++++++++
     # main sampling process
@@ -206,13 +210,13 @@ def main(args):
         print(f'Run: {r}')
         x_start = sampler.get_start(images)
         samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True,
-                                         record=args.save_traj, batch_size=args.batch_size)
+                                         record=args.save_traj, batch_size=args.batch_size, gt=images)
         full_samples.append(samples)
         full_trajs.append(trajs)
     full_samples = torch.stack(full_samples, dim=0)
 
     # log metrics
-    results = evaluator.evaluate(images, y, full_samples)
+    results = evaluator.report(images, y, full_samples)
     markdown_text = evaluator.display(results)
     print(markdown_text)
 
