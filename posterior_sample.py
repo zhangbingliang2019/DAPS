@@ -134,9 +134,9 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
                 traj_raw_data = safe_dir(traj_dir / 'raw')
                 torch.save(sde_traj, str(traj_raw_data / 'trajectory_run{:04d}.pth'.format(run)))
             # save mp4 video for trajectories
-            x0hat_traj = sde_traj.image_data['x0hat']
-            x0y_traj = sde_traj.image_data['x0y']
-            xt_traj = sde_traj.image_data['xt']
+            x0hat_traj = sde_traj.tensor_data['x0hat']
+            x0y_traj = sde_traj.tensor_data['x0y']
+            xt_traj = sde_traj.tensor_data['xt']
             for idx in range(total_number):
                 video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
                 save_mp4_video(resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)

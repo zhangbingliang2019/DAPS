@@ -151,12 +151,12 @@ class DiffusionSampler(nn.Module):
         """
             Records the intermediate states during sampling.
         """
-        self.trajectory.add_image(f'xt', x)
-        self.trajectory.add_image(f'score', score)
+        self.trajectory.add_tensor(f'xt', x)
+        self.trajectory.add_tensor(f'score', score)
         self.trajectory.add_value(f'sigma', sigma)
         self.trajectory.add_value(f'factor', factor)
         if epsilon is not None:
-            self.trajectory.add_image(f'epsilon', epsilon)
+            self.trajectory.add_tensor(f'epsilon', epsilon)
 
     def get_start(self, ref):
         """
@@ -279,8 +279,8 @@ class LangevinDynamics(nn.Module):
         """
             Records the intermediate states during sampling.
         """
-        self.trajectory.add_image(f'xi', x)
-        self.trajectory.add_image(f'epsilon', epsilon)
+        self.trajectory.add_tensor(f'xi', x)
+        self.trajectory.add_tensor(f'epsilon', epsilon)
         self.trajectory.add_value(f'loss', loss)
 
     def get_lr(self, ratio):
@@ -371,9 +371,9 @@ class DAPS(nn.Module):
         """
             Records the intermediate states during sampling.
         """
-        self.trajectory.add_image(f'xt', xt)
-        self.trajectory.add_image(f'x0y', x0y)
-        self.trajectory.add_image(f'x0hat', x0hat)
+        self.trajectory.add_tensor(f'xt', xt)
+        self.trajectory.add_tensor(f'x0y', x0y)
+        self.trajectory.add_tensor(f'x0hat', x0hat)
         self.trajectory.add_value(f'sigma', sigma)
         for name in x0hat_results.keys():
             self.trajectory.add_value(f'x0hat_{name}', x0hat_results[name])
@@ -413,11 +413,11 @@ class Trajectory(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.image_data = {}
+        self.tensor_data = {}
         self.value_data = {}
         self._compile = False
 
-    def add_image(self, name, images):
+    def add_tensor(self, name, images):
         """
             Adds image data to the trajectory.
 
@@ -425,9 +425,9 @@ class Trajectory(nn.Module):
                 name (str): Name of the image data.
                 images (torch.Tensor): Image tensor to add.
         """
-        if name not in self.image_data:
-            self.image_data[name] = []
-        self.image_data[name].append(images.detach().cpu())
+        if name not in self.tensor_data:
+            self.tensor_data[name] = []
+        self.tensor_data[name].append(images.detach().cpu())
 
     def add_value(self, name, values):
         """
@@ -450,8 +450,8 @@ class Trajectory(nn.Module):
         """
         if not self._compile:
             self._compile = True
-            for name in self.image_data.keys():
-                self.image_data[name] = torch.stack(self.image_data[name], dim=0)
+            for name in self.tensor_data.keys():
+                self.tensor_data[name] = torch.stack(self.tensor_data[name], dim=0)
             for name in self.value_data.keys():
                 self.value_data[name] = torch.tensor(self.value_data[name])
         return self
@@ -465,8 +465,8 @@ class Trajectory(nn.Module):
                 Trajectory: The merged and compiled trajectory object.
         """
         merged_traj = cls()
-        for name in trajs[0].image_data.keys():
-            merged_traj.image_data[name] = torch.cat([traj.image_data[name] for traj in trajs], dim=1)
+        for name in trajs[0].tensor_data.keys():
+            merged_traj.tensor_data[name] = torch.cat([traj.tensor_data[name] for traj in trajs], dim=1)
         for name in trajs[0].value_data.keys():
             merged_traj.value_data[name] = trajs[0].value_data[name]
         return merged_traj
