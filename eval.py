@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from piq import psnr, ssim, LPIPS
 import prettytable
 import torch
@@ -7,7 +8,7 @@ import numpy as np
 import warnings
 
 
-class Evaluator(nn.Module):
+class Evaluator:
     """
         Evaluation module for computing evaluation metrics.
     """
@@ -20,9 +21,9 @@ class Evaluator(nn.Module):
                 eval_fn_list (tuple): List of evaluation functions to use.
         """
         super().__init__()
-        self.eval_fn = torch.nn.ModuleDict()
+        self.eval_fn = {}
         for eval_fn in eval_fn_list:
-            self.eval_fn.add_module(eval_fn.name, eval_fn)
+            self.eval_fn[eval_fn.name] = eval_fn
         self.main_eval_fn_name = eval_fn_list[0].name
 
     def get_main_eval_fn(self):
@@ -31,7 +32,7 @@ class Evaluator(nn.Module):
         """
         return self.eval_fn[self.main_eval_fn_name]
 
-    def forward(self, gt, measurement, x, reduction='mean'):
+    def __call__(self, gt, measurement, x, reduction='mean'):
         """
             Computes evaluation metrics for the given input.
 
@@ -160,11 +161,12 @@ def get_eval_fn_cmp(name: str):
     return __EVAL_FN_CMP__[name]
 
 
-class EvalFn(torch.nn.Module):
+class EvalFn(ABC):
     def norm(self, x):
         return (x * 0.5 + 0.5).clip(0, 1)
 
-    def forward(self, gt, measurement, sample, reduction='none'):
+    @abstractmethod
+    def __call__(self, gt, measurement, sample, reduction='none'):
         pass
 
 
@@ -172,7 +174,7 @@ class EvalFn(torch.nn.Module):
 class PeakSignalNoiseRatio(EvalFn):
     cmp = 'max'  # the higher, the better
 
-    def forward(self, gt, measurement, sample, reduction='none'):
+    def __call__(self, gt, measurement, sample, reduction='none'):
         return psnr(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
 
 
@@ -180,7 +182,7 @@ class PeakSignalNoiseRatio(EvalFn):
 class StructuralSimilarityIndexMeasure(EvalFn):
     cmp = 'max'  # the higher, the better
 
-    def forward(self, gt, measurement, sample, reduction='none'):
+    def __call__(self, gt, measurement, sample, reduction='none'):
         return ssim(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
 
 
@@ -189,10 +191,9 @@ class LearnedPerceptualImagePatchSimilarity(EvalFn):
     cmp = 'min'  # the higher, the better
 
     def __init__(self):
-        super().__init__()
         self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
 
-    def forward(self, gt, measurement, sample, reduction='none'):
+    def __call__(self, gt, measurement, sample, reduction='none'):
         res = self.lpips_fn(self.norm(gt), self.norm(sample))
         if reduction == 'mean':
             res = res.mean()
