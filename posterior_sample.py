@@ -72,7 +72,7 @@ def tensor_to_numpy(x):
     return np_images.astype(np.uint8)
 
 
-def save_mp4_video(y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5, space=4):
+def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5, space=4):
     """
         stack and save trajectory as mp4 video
     """
@@ -83,12 +83,16 @@ def save_mp4_video(y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5,
     np_x0y_traj = tensor_to_numpy(x0y_traj[reindex])
     np_xt_traj = tensor_to_numpy(xt_traj[reindex])
     np_y = tensor_to_numpy(y[None])[0]
+    np_gt = tensor_to_numpy(gt[None])[0]
     for x0hat, x0y, xt in zip(np_x0hat_traj, np_x0y_traj, np_xt_traj):
-        canvas = np.ones((ix, 4 * iy + 4 * space, 3), dtype=np.uint8) * 255
+        canvas = np.ones((ix, 5 * iy + 4 * space, 3), dtype=np.uint8) * 255
         cx = cy = 0
         canvas[cx:cx + ix, cy:cy + iy] = np_y
 
-        cy += iy + 2 * space
+        cy += iy + space
+        canvas[cx:cx + ix, cy:cy + iy] = np_gt
+
+        cy += iy + space
         canvas[cx:cx + ix, cy:cy + iy] = x0y
 
         cy += iy + space
@@ -139,7 +143,7 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
             xt_traj = sde_traj.tensor_data['xt']
             for idx in range(total_number):
                 video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
-                save_mp4_video(resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
+                save_mp4_video(images[idx], resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
 
     # log the evaluation metrics
     with open(str(root / 'eval.md'), 'w') as file:
