@@ -16,7 +16,7 @@ Our approach enables the exploration of a larger solution space, improving the s
 
 ## Customizing DAPS for New Inverse Problems
 
-We provide a [notebook](scripts/customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb).
+We provide a [notebook](scripts/Customization.ipynb) for detailed guidance [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb).
 
 
 
