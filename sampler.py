@@ -349,7 +349,7 @@ class DAPS(nn.Module):
             xt = x0y + torch.randn_like(x0y) * self.annealing_scheduler.sigma_steps[step + 1]
 
             # 4. evaluation
-            x0hat_results = x0y_results = None
+            x0hat_results = x0y_results = {}
             if evaluator and 'gt' in kwargs:
                 with torch.no_grad():
                     gt = kwargs['gt']
