@@ -259,7 +259,7 @@ class LangevinDynamics(nn.Module):
         for _ in pbar:
             optimizer.zero_grad()
             loss = operator.error(x, measurement).sum() / (2 * self.tau ** 2)
-            loss += ((x - x0hat) ** 2).sum() / (2 * sigma ** 2)
+            loss += ((x - x0hat.detach()) ** 2).sum() / (2 * sigma ** 2)
             loss.backward()
             optimizer.step()
             with torch.no_grad():
