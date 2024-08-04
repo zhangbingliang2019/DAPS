@@ -175,7 +175,7 @@ class PeakSignalNoiseRatio(EvalFn):
     cmp = 'max'  # the higher, the better
 
     def __call__(self, gt, measurement, sample, reduction='none'):
-        return psnr(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
+        return psnr(self.norm(gt), self.norm(sample), data_range=1.0, reduction=reduction)
 
 
 @register_eval_fn('ssim')
@@ -183,18 +183,28 @@ class StructuralSimilarityIndexMeasure(EvalFn):
     cmp = 'max'  # the higher, the better
 
     def __call__(self, gt, measurement, sample, reduction='none'):
-        return ssim(self.norm(gt), self.norm(sample), 1.0, reduction=reduction)
+        return ssim(self.norm(gt), self.norm(sample), data_range=1.0, reduction=reduction)
 
 
 @register_eval_fn('lpips')
 class LearnedPerceptualImagePatchSimilarity(EvalFn):
     cmp = 'min'  # the higher, the better
 
-    def __init__(self):
+    def __init__(self, batch_size=128):
+        self.batch_size = batch_size
         self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
 
+    def evaluate_in_batch(self, gt, pred):
+        batch_size = self.batch_size
+        results = []
+        for start in range(0, gt.shape[0], batch_size):
+            res = self.lpips_fn(self.norm(gt[start:start+batch_size]), self.norm(pred[start:start+batch_size]))
+            results.append(res)
+        results = torch.cat(results, dim=0)
+        return results
+
     def __call__(self, gt, measurement, sample, reduction='none'):
-        res = self.lpips_fn(self.norm(gt), self.norm(sample))
+        res = self.evaluate_in_batch(gt, sample)
         if reduction == 'mean':
             res = res.mean()
         return res
