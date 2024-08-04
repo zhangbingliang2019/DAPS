@@ -3,7 +3,7 @@ gpu_ids: [0]
 
 #### network structures
 KernelWizard:
-  pretrained: experiments/pretrained/GOPRO_wVAE.pth
+  pretrained: forward_operator/bkse/experiments/pretrained/GOPRO_wVAE.pth
   input_nc: 3
   nf: 64
   front_RBs: 10
