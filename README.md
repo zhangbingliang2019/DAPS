@@ -214,32 +214,3 @@ If you find our work interesting, please consider citing
       url={https://arxiv.org/abs/2407.01521}, 
 }
 ```
-
-
-
-
-
-```
-CUDA_VISIBLE_DEVICES=1 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-CUDA_VISIBLE_DEVICES=2 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-CUDA_VISIBLE_DEVICES=3 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-CUDA_VISIBLE_DEVICES=4 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-CUDA_VISIBLE_DEVICES=5 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-CUDA_VISIBLE_DEVICES=6 wandb agent caltech-cms165/DAPS/n9mkupn7 &
-
-python posterior_sample.py \
-+data=test-ffhq \
-+model=ffhq256ldm \
-+task=nonlinear_blur \
-+sampler=latent_edm_daps \
-task_group=ldm \
-save_dir=results/ldm/ffhq \
-num_runs=1 \
-sampler.diffusion_scheduler_config.num_steps=2 \
-sampler.annealing_scheduler_config.num_steps=50 \
-batch_size=10 \
-name=nonlinear_blur \
-gpu=5 & 
-
-```
-
