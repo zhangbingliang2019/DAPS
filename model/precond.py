@@ -42,7 +42,7 @@ class VPPrecond(torch.nn.Module):
     def forward(self, x, sigma, class_labels=None, force_fp32=False, **model_kwargs):
         x = x.to(torch.float32)
         sigma = sigma.to(torch.float32).reshape(-1, 1, 1, 1)
-        class_labels = None if self.label_dim == 0 else torch.zeros([1, self.label_dim], device=x.device) if class_labels is None else class_labels.to(torch.float32).reshape(-1, self.label_dim)
+        # class_labels = None if self.label_dim == 0 else torch.zeros([1, self.label_dim], device=x.device) if class_labels is None else class_labels.to(torch.float32).reshape(-1, self.label_dim)
         dtype = torch.float16 if (self.use_fp16 and not force_fp32 and x.device.type == 'cuda') else torch.float32
 
         c_skip = 1
@@ -212,7 +212,14 @@ class EDMPrecond(torch.nn.Module):
 
 #----------------------------------------------------------------------------
 
-class LDM(torch.nn.Module):
+class LatentDMWrapper(torch.nn.Module):
+    """
+    Wrapper class for latent diffusion models.
+
+    Attributes:
+        model (torch.nn.Module): 
+            The underlying latent diffusion model.
+    """
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -225,3 +232,7 @@ class LDM(torch.nn.Module):
     
     def forward(self, z, t, class_labels=None):
         return self.model.apply_model(z, t, class_labels)
+    
+    def get_condition(self, class_labels):
+        uc = self.model.get_learned_conditioning({self.model.cond_stage_key: class_labels})
+        return uc

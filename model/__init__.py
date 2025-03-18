@@ -1,93 +1,84 @@
-from .edm import dnnlib
-import pickle
 import torch
 import torch.nn as nn
-from .ddpm.unet import create_model
-from omegaconf import OmegaConf
+from torch.nn import functional as F
+import os
+import warnings
 import importlib
 from abc import abstractmethod
-from .precond import VPPrecond, LDM
-import sys
-import warnings
+from .ddpm.unet import create_model
+from .precond import VPPrecond, LatentDMWrapper
+from diffusers import StableDiffusionPipeline
+from cores.scheduler import VPScheduler
+
 
 __MODEL__ = {}
 
 
 def register_model(name: str):
     def wrapper(cls):
-        if __MODEL__.get(name, None):
-            if __MODEL__[name] != cls:
-                warnings.warn(f"Name {name} is already registered!", UserWarning)
+        if name in __MODEL__ and __MODEL__[name] != cls:
+            warnings.warn(f"Model '{name}' is already registered.", UserWarning)
         __MODEL__[name] = cls
         cls.name = name
         return cls
-
     return wrapper
 
 
 def get_model(name: str, **kwargs):
-    if __MODEL__.get(name, None) is None:
-        raise NameError(f"Name {name} is not defined.")
+    if name not in __MODEL__:
+        raise NameError(f"Model '{name}' is not registered.")
     return __MODEL__[name](**kwargs)
 
 
 class DiffusionModel(nn.Module):
     """
-    A class representing a diffusion model.
-    Methods:
-        score(x, sigma): Calculates the score function of time-varying noisy distribution:
-
-                \nabla_{x_t}\log p(x_t;\sigma_t)
-
-        tweedie(x, sigma): Calculates the expectation of clean data (x0) given noisy data (xt):
-
-             \mathbb{E}_{x_0 \sim p(x_0 \mid x_t)}[x_0 \mid x_t]
+    Base Diffusion Model class.
+    Requires overriding either 'score' or 'tweedie' method.
     """
 
     def __init__(self):
         super(DiffusionModel, self).__init__()
-        # Check if either `score` or `tweedie` is overridden
         if (self.score.__func__ is DiffusionModel.score and
-                self.tweedie.__func__ is DiffusionModel.tweedie):
-            raise NotImplementedError(
-                "Either `score` or `tweedie` method must be implemented."
-            )
+            self.tweedie.__func__ is DiffusionModel.tweedie):
+            raise NotImplementedError("Either 'score' or 'tweedie' method must be overridden.")
 
     def score(self, x, sigma):
         """
-            x       : noisy state at time t, torch.Tensor([B, *data.shape])
-            sigma   : noise level at time t, scaler
+        Compute the score function \nabla_{x_t} log p(x_t; sigma_t).
+
+        Args:
+            x (Tensor): Noisy input tensor at time t, shape [B, *data_shape].
+            sigma (float): Noise level at time t.
         """
         d = self.tweedie(x, sigma)
         return (d - x) / sigma ** 2
 
     def tweedie(self, x, sigma):
         """
-            x       : noisy state at time t, torch.Tensor([B, *data.shape])
-            sigma   : noise level at time t, scaler
+        Compute the expected clean data given noisy data.
+
+        Args:
+            x (Tensor): Noisy input tensor at time t, shape [B, *data_shape].
+            sigma (float): Noise level at time t.
         """
         return x + self.score(x, sigma) * sigma ** 2
+
+    def get_in_shape(self):
+        """Return the shape of the model's input data."""
+        pass
 
 
 class LatentDiffusionModel(nn.Module):
     """
-    A class representing a latent diffusion model.
-    Methods:
-        encode(x0): Encodes the input `x0` into latent space.
-        decode(z0): Decodes the latent variable `z0` into the output space.
-        score(z, sigma): Calculates the score of the latent diffusion model given the latent variable `z` and standard deviation `sigma`.
-        tweedie(z, sigma): Calculates the Tweedie distribution given the latent variable `z` and standard deviation `sigma`.
-        Must overload either `score` or `tweedie` method.
+    Base Latent Diffusion Model class.
+    Requires overriding either 'score' or 'tweedie' method and 'encode', 'decode' methods.
     """
 
     def __init__(self):
         super(LatentDiffusionModel, self).__init__()
-        # Check if either `score` or `tweedie` is overridden
         if (self.score.__func__ is LatentDiffusionModel.score and
-                self.tweedie.__func__ is LatentDiffusionModel.tweedie):
-            raise NotImplementedError(
-                "Either `score` or `tweedie` method must be implemented."
-            )
+            self.tweedie.__func__ is LatentDiffusionModel.tweedie):
+            raise NotImplementedError("Either 'score' or 'tweedie' method must be overridden.")
 
     @abstractmethod
     def encode(self, x0):
@@ -104,17 +95,20 @@ class LatentDiffusionModel(nn.Module):
     def tweedie(self, z, sigma):
         return z + self.score(z, sigma) * sigma ** 2
 
+    def get_in_shape(self):
+        pass
+
 
 @register_model(name='ddpm')
 class DDPM(DiffusionModel):
     """
-    DDPM (Diffusion Denoising Probabilistic Model)
+    DDPM (Diffusion Denoising Probabilistic Model).
     Attributes:
         model (VPPrecond): The neural network used for denoising.
 
     Methods:
         __init__(self, model_config, device='cuda'): Initializes the DDPM object.
-        tweedie(self, x, sigma=2e-3): Applies the DDPM model to denoise the input, using VP preconditioning from EDM.
+        tweedie(self, x, sigma): Applies the DDPM model to denoise the input, using VP preconditioning from EDM.
     """
 
     def __init__(self, model_config, device='cuda', requires_grad=False):
@@ -123,46 +117,37 @@ class DDPM(DiffusionModel):
                                conditional=model_config['class_cond']).to(device)
         self.model.eval()
         self.model.requires_grad_(requires_grad)
+        self.image_size = model_config['image_size']
 
-    def tweedie(self, x, sigma=2e-3):
+    def tweedie(self, x, sigma):
         return self.model(x, torch.as_tensor(sigma).to(x.device))
 
+    def get_in_shape(self):
+        return (3, self.image_size, self.image_size)
+        
 
-@register_model(name='edm')
-class EDM(DiffusionModel):
+@register_model(name='ldm')
+class LDM(LatentDiffusionModel):
     """
-    Diffusion models from EDM (Elucidating the Design Space of Diffusion-Based Generative Models).
-    """
+    Latent Diffusion Model (LDM).
 
-    def __init__(self, model_config, device='cuda', requires_grad=False):
-        super().__init__()
-        self.model = self.load_pretrained_model(model_config['model_path'], device=device)
-
-        self.model.eval()
-        self.model.requires_grad_(requires_grad)
-
-    def load_pretrained_model(self, url, device='cuda'):
-        with dnnlib.util.open_url(url) as f:
-            sys.path.append('model/edm')
-            model = pickle.load(f)['ema'].to(device)
-        return model
-
-    def tweedie(self, x, sigma=2e-3):
-        return self.model(x, torch.as_tensor(sigma).to(x.device))
-
-
-@register_model(name='ldm_ddpm')
-class LatentDDPM(LatentDiffusionModel):
-    """
-    Latent Diffusion Models (High-Resolution Image Synthesis with Latent Diffusion Models).
+    Attributes:
+        net (LatentDMWrapper):
+            Wrapper around the latent diffusion model's internal network (encoder/decoder).
+        model (VPPrecond):
+            Diffusion model wrapped with VP preconditioning.
+        is_conditional (bool):
+            Indicates whether the model is conditional or unconditional.
     """
 
     def __init__(self, ldm_config, diffusion_path, device='cuda', requires_grad=False):
         super().__init__()
-        config = OmegaConf.load(ldm_config)
-        net = LDM(load_model_from_config(config, diffusion_path)).to(device)
-        self.model = VPPrecond(model=net).to(device)
-
+        self.net = LatentDMWrapper(load_model_from_config(ldm_config, diffusion_path)).to(device)
+        self.is_conditional = not (ldm_config.model.params.cond_stage_config == '__is_unconditional__')
+        label_dim = 1 if self.is_conditional else 0
+        self.model = VPPrecond(label_dim=label_dim, model=self.net, conditional=self.is_conditional).to(device)
+        self.image_size = ldm_config.model.params.image_size
+        self.latent_channels = ldm_config.model.params.first_stage_config.params.embed_dim
         self.model.eval()
         self.model.requires_grad_(requires_grad)
 
@@ -172,8 +157,15 @@ class LatentDDPM(LatentDiffusionModel):
     def decode(self, z0):
         return self.model.model.decode(z0)
 
-    def tweedie(self, x, sigma=2e-3):
-        return self.model(x, torch.as_tensor(sigma).to(x.device))
+    def tweedie(self, x, sigma):
+        class_labels = None
+        if self.is_conditional:
+            # for ImageNet checkpoint
+            class_labels = self.net.get_condition(torch.as_tensor([1000]).to(x.device))
+        return self.model(x, torch.as_tensor(sigma).to(x.device), class_labels=class_labels)
+
+    def get_in_shape(self):
+        return (self.latent_channels, self.image_size, self.image_size)
 
 
 def get_obj_from_str(string, reload=False):
@@ -209,3 +201,100 @@ def load_model_from_config(config, ckpt, train=False):
         model.eval()
 
     return model
+
+
+@register_model(name='sdm')
+class StableDiffusionModel(LatentDiffusionModel):
+    """
+    Stable Diffusion Model (SD) with fixed text prompts.
+
+    Attributes:
+        pipe (StableDiffusionPipeline): Hugging Face diffusion pipeline.
+        vae (nn.Module): Variational Autoencoder for encoding/decoding images.
+        unet (nn.Module): U-Net diffusion network for denoising.
+        scheduler (VPScheduler): Scheduler for diffusion timesteps.
+    """
+    def __init__(self, model_id = "stabilityai/stable-diffusion-2-1", inner_resolution=768, target_resolution=256, guidance_scale=7.5, prompt='a natural looking human face', device='cuda', hf_home='checkpoints/.cache/huggingface'):
+        super().__init__()
+        os.environ["HF_HOME"] = hf_home
+        pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
+        self.pipe = pipe.to(device)
+        self.vae = self.pipe.vae
+        self.guidance_scale = guidance_scale
+        self.prompt = prompt
+        self.device = device
+        self.unet = self.pipe.unet
+        self.latent_scale = self.pipe.vae.config.scaling_factor
+        self.dtype = torch.float16
+        self.resolution = inner_resolution
+        self.target_resolution = target_resolution
+        # scheduling
+        scheduler = pipe.scheduler
+        self.scheduler = VPScheduler(
+            num_steps=scheduler.config.num_train_timesteps,
+            beta_max=scheduler.config.beta_end * scheduler.config.num_train_timesteps,
+            beta_min=scheduler.config.beta_start * scheduler.config.num_train_timesteps,
+            epsilon=0,
+            beta_type=scheduler.config.beta_schedule,
+        )
+        self.unet.requires_grad_(False)
+    
+    def encode(self, x0):
+        source_dtype = x0.dtype
+        x0 = x0.to(self.dtype)
+        x0 = F.interpolate(x0, size=self.resolution, mode='bilinear')
+        latents = (self.vae.encode(x0).latent_dist.sample()*self.latent_scale).to(source_dtype)
+        return latents
+    
+    def decode(self, z0):
+        source_dtype = z0.dtype
+        z0 = z0.to(self.dtype)
+        x0 = self.vae.decode(z0/self.latent_scale).sample.to(source_dtype)
+        x0 = F.interpolate(x0, size=self.target_resolution, mode='bilinear')
+        return x0
+    
+    def tweedie(self, z, sigma, c=None):
+        if c is None:
+            c = self.prompt
+        # dtype: torch.float32
+        source_dtype = z.dtype
+        latent = z.to(self.dtype)
+
+        # compute correct sigma
+        sigma = sigma.to(self.dtype).view(-1, *([1] * len(latent.shape[1:])))
+
+        # pre conditioning
+        c_skip = 1
+        c_out = -sigma
+        c_in = 1 / (sigma ** 2 + 1).sqrt()
+        c_noise = (self.scheduler.num_steps - 1) * self.scheduler.get_sigma_inv(sigma)
+
+        # get tweedie
+        # 1. encode prompt
+        prompt_embeds, negative_prompt_embeds = self.pipe.encode_prompt(
+            prompt=c, 
+            device=z.device, 
+            num_images_per_prompt=1, 
+            do_classifier_free_guidance=True, 
+        )
+        prompt_embeds = torch.cat([negative_prompt_embeds] * z.shape[0]+ [prompt_embeds] * z.shape[0], dim=0)
+
+        # 2. get unet output
+        latent_model_input = torch.cat([latent] * 2) * c_in
+        t_input = c_noise.flatten()
+        noise_pred = self.unet(latent_model_input, t_input, encoder_hidden_states=prompt_embeds, return_dict=False)[0]
+
+        # 3. classifier free guidance
+        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)        
+        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+
+        denoised = c_skip * z + c_out * noise_pred.to(source_dtype)
+        return denoised
+
+    def get_in_shape(self):
+        num_channels_latents = self.pipe.unet.config.in_channels
+        latents = self.pipe.prepare_latents(
+            1, num_channels_latents, self.resolution, self.resolution, self.dtype, self.device, None, None
+        )
+        return latents.shape[1:]
+    

@@ -16,6 +16,7 @@ import setproctitle
 from PIL import Image
 import numpy as np
 import imageio
+import os
 
 
 def resize(y, x, task_name):
@@ -64,6 +65,7 @@ def tensor_to_pils(x):
         pils.append(pil_x)
     return pils
 
+
 def tensor_to_numpy(x):
     """
         [B, C, H, W] tensor -> [B, C, H, W] numpy
@@ -107,12 +109,14 @@ def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, se
 def log_results(args, sde_trajs, results, images, y, full_samples, table_markdown, total_number):
     # log hyperparameters and configurations
     full_samples = full_samples.flatten(0, 1)
-    root = safe_dir(Path(args.save_dir) / args.name)
+    os.makedirs(args.save_dir, exist_ok=True)
+    save_dir = safe_dir(Path(args.save_dir))
+    root = safe_dir(save_dir / args.name)
     with open(str(root / 'config.yaml'), 'w') as file:
         yaml.safe_dump(OmegaConf.to_container(args, resolve=True), file, default_flow_style=False, allow_unicode=True)
 
     # log grid results
-    resized_y = resize(y, images, args.task.operator.name)
+    resized_y = resize(y, images, args.task[args.task_group].operator.name)
     stack = torch.cat([images, resized_y, full_samples])
     save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
 
@@ -172,7 +176,7 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
     return torch.cat(samples, dim=0), trajs
 
 
-@hydra.main(version_base='1.3', config_path='config', config_name='default.yaml')
+@hydra.main(version_base='1.3', config_path='configs', config_name='default.yaml')
 def main(args):
     # fix random seed
     np.random.seed(args.seed)
@@ -191,11 +195,12 @@ def main(args):
     images = data.get_data(total_number, 0)
 
     # get operator & measurement
-    operator = get_operator(**args.task.operator)
+    task_group = args.task[args.task_group]
+    operator = get_operator(**task_group.operator)
     y = operator.measure(images)
 
     # get sampler
-    sampler = get_sampler(**args.sampler, lgvd_config=args.task.lgvd_config)
+    sampler = get_sampler(**args.sampler, mcmc_sampler_config=task_group.mcmc_sampler_config)
 
     # get model
     model = get_model(**args.model)
@@ -212,7 +217,7 @@ def main(args):
     full_trajs = []
     for r in range(args.num_runs):
         print(f'Run: {r}')
-        x_start = sampler.get_start(images)
+        x_start = sampler.get_start(images.shape[0], model)
         samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True,
                                          record=args.save_traj, batch_size=args.batch_size, gt=images)
         full_samples.append(samples)

@@ -1,0 +1,46 @@
+# pixel space task
+pixel:
+  mcmc_sampler_config:  
+    num_steps: 200
+    lr: 1e-5
+    tau: 0.01
+    lr_min_ratio: 0.01
+    mc_algo: langevin
+    prior_solver: gaussian
+  
+  operator:
+    name: nonlinear_blur
+    opt_yml_path: forward_operator/bkse/options/generate_blur/default.yml
+    sigma: 0.05
+
+# latent diffusion model
+ldm: 
+  mcmc_sampler_config: 
+    num_steps: 80
+    lr: 3.71e-6
+    tau: 0.01
+    lr_min_ratio: 0.024
+    momentum: 0.91
+    mc_algo: hmc
+    prior_solver: gaussian
+
+  operator:
+    name: nonlinear_blur
+    opt_yml_path: forward_operator/bkse/options/generate_blur/default.yml
+    sigma: 0.05
+
+# stable diffusion 
+sd: 
+  mcmc_sampler_config: 
+    num_steps: 60
+    lr: 1e-5
+    tau: 0.01
+    lr_min_ratio: 1
+    momentum: 0.80
+    mc_algo: hmc
+    prior_solver: gaussian
+
+  operator:
+    name: nonlinear_blur
+    opt_yml_path: forward_operator/bkse/options/generate_blur/default.yml
+    sigma: 0.01

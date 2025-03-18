@@ -1,0 +1,50 @@
+# pixel space task
+pixel:
+  mcmc_sampler_config:  
+    num_steps: 100
+    lr: 1e-4
+    tau: 0.01
+    lr_min_ratio: 0.01
+    mc_algo: langevin
+    prior_solver: gaussian
+  
+  operator:
+    name: down_sampling
+    resolution: 256
+    scale_factor: 4
+    sigma: 0.05
+
+# latent diffusion model
+ldm: 
+  mcmc_sampler_config: 
+    num_steps: 24
+    lr: 1.35e-4 
+    tau: 0.01
+    lr_min_ratio: 0.023
+    momentum: 0.86
+    mc_algo: hmc
+    prior_solver: gaussian
+
+  operator:
+    name: down_sampling
+    resolution: 256
+    scale_factor: 4
+    sigma: 0.05
+
+# stable diffusion
+sd: 
+  mcmc_sampler_config: 
+    num_steps: 30
+    lr: 1e-4
+    tau: 0.01
+    lr_min_ratio: 1
+    momentum: 0.45
+    mc_algo: hmc
+    prior_solver: gaussian
+
+  operator:
+    name: down_sampling
+    resolution: 256
+    scale_factor: 4
+    sigma: 0.01
+

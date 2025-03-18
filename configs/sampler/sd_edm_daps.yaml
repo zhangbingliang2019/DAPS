@@ -1,0 +1,14 @@
+latent: True
+
+annealing_scheduler_config:
+  name: 'edm'
+  num_steps: 50
+  sigma_max: 10
+  sigma_min: 0.1
+  timestep: 'poly-7'
+
+diffusion_scheduler_config:
+  name: 'edm'
+  num_steps: 2
+  sigma_min: 0.001
+  timestep: 'poly-7'

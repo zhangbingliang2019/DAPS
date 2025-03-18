@@ -41,11 +41,11 @@ class DiffusionData(ABC, Dataset):
     def __len__(self):
         pass
 
-    def get_data(self, size=16, sigma=2e-3):
+    def get_data(self, size=16, sigma=0):
         data = torch.stack([self.__getitem__(i) for i in range(size)], dim=0)
         return data + torch.randn_like(data) * sigma
 
-    def get_random(self, size=16, sigma=2e-3):
+    def get_random(self, size=16, sigma=0):
         shape = (size, *self.get_shape())
         return torch.randn(shape) * sigma
 

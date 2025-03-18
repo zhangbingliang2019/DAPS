@@ -44,6 +44,18 @@ typing_extensions==4.11.0
 urllib3==1.26.12
 wandb==0.17.0
 wcwidth==0.2.13
-zipp==3.18.2
 imageio==2.34.2
 imageio-ffmpeg==0.5.1
+torchdiffeq==0.2.5
+diffusers==0.32.2
+huggingface-hub==0.29.3
+importlib-metadata==8.5.0
+regex-2024==11.6
+safetensors==0.5.3
+zipp==3.20.2
+tokenizers==0.20.3
+transformers==4.46.3
+pytorch-lightning==1.0.8
+einops==0.8.1
+kornia==0.7.3
+-e git+https://github.com/openai/CLIP.git@main#egg=clip

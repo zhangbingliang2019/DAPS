@@ -1,0 +1,8 @@
+name: 'sdm'
+
+model_id: stable-diffusion-v1-5/stable-diffusion-v1-5
+inner_resolution: 512
+target_resolution: 256
+guidance_scale: 7.5
+prompt: 'a natural looking image'
+hf_home: checkpoints/.cache/huggingface

@@ -1,0 +1,44 @@
+program: posterior_sample.py
+method: bayes
+metric:
+  goal: maximize
+  name: psnr_all
+
+parameters:
+  task.ldm.mcmc_sampler_config.num_steps:
+    min: 10
+    max: 100
+
+  task.ldm.mcmc_sampler_config.lr:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 1e-3
+
+  task.ldm.mcmc_sampler_config.momentum:
+    min: 0.0
+    max: 1.0
+  
+  task.ldm.mcmc_sampler_config.lr_min_ratio:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 1.0
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - +data=demo-ffhq
+  - +model=ffhq256ldm
+  - +task=phase_retrieval
+  - num_runs=4
+  - +sampler=latent_edm_daps
+  - task_group=ldm
+  - save_dir=results/sweep
+  - batch_size=5
+  - data.start_id=0
+  - data.end_id=5
+  - gpu=0
+  - name=sweep
+  - wandb=True
+  - ${args_no_hyphens}
+  

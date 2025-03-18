@@ -1,0 +1,52 @@
+# pixel space task
+pixel:
+  mcmc_sampler_config:  
+    num_steps: 100
+    lr: 1e-4
+    tau: 0.01
+    lr_min_ratio: 0.01
+    mc_algo: langevin
+    prior_solver: gaussian
+  
+  operator:
+    name: inpainting
+    mask_type: random  
+    mask_prob_range: [ 0.70, 0.71 ]  # for random
+    resolution: 256
+    sigma: 0.05
+
+# latent diffusion model
+ldm: 
+  mcmc_sampler_config: 
+    num_steps: 38
+    lr: 8.40e-6
+    tau: 0.01
+    lr_min_ratio: 0.013
+    momentum: 0.92
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: inpainting
+    mask_type: random  
+    mask_prob_range: [ 0.70, 0.71 ]  # for random
+    resolution: 256
+    sigma: 0.05
+
+# stable diffusion 
+sd: 
+  mcmc_sampler_config: 
+    num_steps: 15
+    lr: 3e-5
+    tau: 0.01
+    lr_min_ratio: 1
+    momentum: 0.60
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: inpainting
+    mask_type: random  
+    mask_prob_range: [ 0.70, 0.71 ]  # for random
+    resolution: 256
+    sigma: 0.01

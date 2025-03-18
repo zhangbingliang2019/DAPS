@@ -1,0 +1,5 @@
+name: image
+root: 'dataset/test-ffhq'
+resolution: 256
+start_id: 0
+end_id: 100

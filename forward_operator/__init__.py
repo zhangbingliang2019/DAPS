@@ -10,6 +10,7 @@ import scipy
 import numpy as np
 import yaml
 import warnings
+from torch.autograd import grad
 
 __OPERATOR__ = {}
 
@@ -32,22 +33,81 @@ def get_operator(name: str, **kwargs):
 
 
 class Operator(ABC):
+    """
+    Abstract base class for operators in diffusion processes.
+
+    Attributes:
+        sigma (float): Standard deviation of measurement noise.
+    """
     def __init__(self, sigma=0.05):
+        """
+        Initializes the operator with a noise standard deviation.
+
+        Args:
+            sigma (float, optional): Measurement noise level. Defaults to 0.05.
+        """
         self.sigma = sigma
 
     @abstractmethod
     def __call__(self, x):
+        """
+        Abstract method: apply operator to input data.
+
+        Args:
+            x (torch.Tensor): Input data tensor.
+
+        Returns:
+            torch.Tensor: Output after applying the operator.
+        """
         pass
 
     def measure(self, x):
+        """
+        Measures input data by applying the operator and adding Gaussian noise.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Noisy measurement result.
+        """
         y0 = self(x)
         return y0 + self.sigma * torch.randn_like(y0)
 
-    def error(self, x, y):
+    def loss(self, x, y):
+        """
+        Computes squared-error loss between operator output and observed data.
+
+        Args:
+            x (torch.Tensor): Input data tensor.
+            y (torch.Tensor): Observed measurement tensor.
+
+        Returns:
+            torch.Tensor: Loss values (one per sample).
+        """
         return ((self(x) - y) ** 2).flatten(1).sum(-1)
 
+    def gradient(self, x, y, return_loss=False):
+        """
+        Computes gradient of the loss with respect to input x.
+
+        Args:
+            x (torch.Tensor): Input tensor requiring gradient.
+            y (torch.Tensor): Observed measurements.
+            return_loss (bool, optional): If True, returns both gradient and loss. Defaults to False.
+
+        Returns:
+            torch.Tensor or tuple: Gradient tensor (and optionally the loss value).
+        """
+        x_tmp = x.clone().detach().requires_grad_(True)
+        loss = self.loss(x_tmp, y).sum()
+        x_grad = torch.autograd.grad(loss, x_tmp)[0]
+        if return_loss:
+            return x_grad, loss
+        return x_grad
+
     def log_likelihood(self, x, y):
-        return -self.error(x, y) / 2 / self.sigma ** 2
+        return -self.loss(x, y) / 2 / self.sigma ** 2
 
     def likelihood(self, x, y):
         return torch.exp(self.log_likelihood(x, y))
@@ -316,3 +376,32 @@ class HighDynamicRange(Operator):
 
     def __call__(self, data):
         return torch.clip((data * self.scale), -1, 1)
+
+
+class LatentWrapper(Operator):
+    def __init__(self, op, model):
+        super().__init__(sigma=op.sigma)
+        self.op = op
+        self.model = model
+
+    def __call__(self, x):
+        decoded = self.model.decode(x)
+        return self.op(decoded)
+
+
+    def loss(self, pred, observation):
+        decoded = self.model.decode(pred)
+        return self.op.loss(decoded.float(), observation)
+
+    def gradient(self, pred, observation, return_loss=False):
+        pred_tmp = pred.clone().detach().requires_grad_(True)
+        loss = self.loss(pred_tmp, observation).sum()
+        pred_grad = grad(loss, pred_tmp)[0]
+        pred_grad = pred_grad.to(pred.dtype)
+        # clip the gradient
+        pred_grad = torch.clamp(pred_grad, -1, 1)
+        if return_loss:
+            return pred_grad, loss
+        else:
+            return pred_grad
+        

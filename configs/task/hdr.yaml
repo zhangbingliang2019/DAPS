@@ -1,0 +1,47 @@
+# pixel space task
+pixel:
+  mcmc_sampler_config:  
+    num_steps: 100
+    lr: 2e-5
+    tau: 0.01
+    lr_min_ratio: 0.01
+    mc_algo: langevin
+    prior_solver: gaussian
+  
+  operator:
+    name: high_dynamic_range
+    scale: 2
+    sigma: 0.05
+
+# latent diffusion model
+ldm: 
+  mcmc_sampler_config: 
+    num_steps: 38
+    lr: 4.52e-06
+    tau: 0.01
+    lr_min_ratio: 0.015
+    momentum: 0.58
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: high_dynamic_range
+    scale: 2
+    sigma: 0.05
+
+# stable diffusion
+sd: 
+  mcmc_sampler_config: 
+    num_steps: 45
+    lr: 1.0e-05
+    tau: 0.01
+    lr_min_ratio: 1
+    momentum: 0.7
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: high_dynamic_range
+    scale: 2
+    sigma: 0.01
+
