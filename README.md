@@ -143,7 +143,7 @@ It takes about 8 minutes (2 for each run) and 6G GPU memory on a single NVIDIA A
 Full comands used to reproduce the results in paper are provided in `commands` folder:
 
 * pixel space diffusion: `commands/pixel.sh`
-* latent diffusion (LDM): `commands/ldm.sh`
+* latent diffusion: `commands/ldm.sh`
 * stable diffusion: `commands/sd.sh`
 
 
