@@ -115,7 +115,7 @@ You can download the selected test dataset used [here](https://drive.google.com/
 
 ### 4. Posterior sampling with DAPS
 
-Now you are ready for run. For **phase retrieval** with `DAPS-1k` and `ffhq256ddpm` model in 4 runs for 10 demo FFHQ images in `dataset/demo-ffhq`:
+Now you are ready to run. For **phase retrieval** with `DAPS-1k` and `ffhq256ddpm` model in 4 runs for 10 demo FFHQ images in `dataset/demo-ffhq`:
 
 ```
 python posterior_sample.py \
