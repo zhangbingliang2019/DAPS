@@ -237,7 +237,18 @@ class StableDiffusionModel(LatentDiffusionModel):
             epsilon=0,
             beta_type=scheduler.config.beta_schedule,
         )
+        self.prediction_type = scheduler.config.prediction_type
         self.unet.requires_grad_(False)
+    
+    def get_noise_prediction(self, latent_model_input, model_output, sigma):
+        alpha = (1 / (sigma ** 2 + 1))
+        if self.prediction_type == 'epsilon':
+            noise_pred = model_output
+        elif self.prediction_type == 'v_prediction':
+            noise_pred = alpha.sqrt() * model_output + (1 - alpha).sqrt() * latent_model_input
+        else:
+            raise NotImplementedError
+        return noise_pred
     
     def encode(self, x0):
         source_dtype = x0.dtype
@@ -282,7 +293,8 @@ class StableDiffusionModel(LatentDiffusionModel):
         # 2. get unet output
         latent_model_input = torch.cat([latent] * 2) * c_in
         t_input = c_noise.flatten()
-        noise_pred = self.unet(latent_model_input, t_input, encoder_hidden_states=prompt_embeds, return_dict=False)[0]
+        model_output = self.unet(latent_model_input, t_input, encoder_hidden_states=prompt_embeds, return_dict=False)[0]
+        noise_pred = self.get_noise_prediction(latent_model_input, model_output, sigma)
 
         # 3. classifier free guidance
         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)        
