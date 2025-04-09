@@ -64,7 +64,15 @@ conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
-### 2. Prepare the pretrained checkpoint
+### 2. Prepare the pretrained checkpoint & test dataset
+
+You can directly use our provided script to download **all of them**:
+
+```
+sh download.sh
+```
+
+Or you can manually download them by following commands:
 
 <details>
   <summary><strong>2.1 pixel diffusion model</strong></summary>
@@ -109,7 +117,7 @@ Checkpoints will be automatically downloaded.
 </details>
 
 <details>
-  <summary><strong>(Optional) 2.4 nonlinear deblur model</strong></summary>
+  <summary><strong>2.4 nonlinear deblur model</strong></summary>
 
 For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
 
@@ -121,15 +129,26 @@ mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
 
 </details>
 
+<details>
+  <summary><strong>2.5 test dataset</strong></summary>
 
+For convenience, we provide the used [test dataset](https://drive.google.com/drive/folders/1RHNif32W0hvB4M75ppG1ypTChy-W3q3Z?usp=sharing) (subset of 100 images of FFHQ and ImageNet dataset):
 
-### 3.  (Optional) Prepare the test dataset
+```bash
+# in DAPS folder
 
-You can download the selected test dataset used [here](https://drive.google.com/drive/folders/1RHNif32W0hvB4M75ppG1ypTChy-W3q3Z?usp=sharing), unzip and move to `dataset` folder. Otherwise, you can test on our provided 10 demo images at `dataset\demo-ffhq` and `dataset\demo-imagenet`.
+gdown https://drive.google.com/uc?id=1IzbnLWPpuIw6Z2E4IKrRByh6ihDE5QLO -O datasets/test-ffhq.zip
+unzip datasets/test-ffhq.zip -d ./datasets
+rm datasets/test-ffhq.zip
 
+gdown https://drive.google.com/uc?id=1pqVO-LYrRRL4bVxUidvy-Eb22edpuFCs -O datasets/test-imagenet.zip
+unzip datasets/test-imagenet.zip -d ./datasets
+rm datasets/test-imagenet.zip
+```
 
+</details>
 
-### 4. Posterior sampling with DAPS
+### 3. Posterior sampling with DAPS
 
 Now you are ready to run. For **phase retrieval** with `DAPS-1k` and `ffhq256ddpm` model in 4 runs for 10 demo FFHQ images in `dataset/demo-ffhq`:
 
@@ -154,7 +173,7 @@ It takes about 8 minutes (2 for each run) and 6G GPU memory on a single NVIDIA A
 
 
 
-### 5. Benchmarking and reproduction
+### 4. Benchmarking and reproduction
 
 #### Full commands on test dataset
 
