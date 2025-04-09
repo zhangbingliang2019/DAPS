@@ -43,7 +43,7 @@ This approach enables the exploration of a larger solution space, improving the 
 ## 💻 Local Setup
 
 <details>
-  <summary><span style="font-size: 1.5em;"><strong>1. Prepare the Environment</strong></span></summary>
+  <summary><h3>1. Prepare the Environment</h3></summary>
 
 
 - python 3.8  
@@ -64,6 +64,8 @@ conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=
 ```
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
+
+<details/>
 
 <details>
   <summary><span style="font-size: 1.5em;"><strong>2. Prepare the pretrained checkpoint</strong></span></summary>
