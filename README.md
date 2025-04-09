@@ -18,7 +18,7 @@ This approach enables the exploration of a larger solution space, improving the 
 
 ## News:
 
-* **2025-04**: DAPS is accepted as **CVPR 2025 Oral** Presentation.
+* **2025-04**: DAPS is accepted as **CVPR 2025 Oral** Presentation 🎉.
 
 * **2025-03:** update code structure and usability to support different MCMC algorithms and various types of diffusion models. The previous code structure has been moved to the `legacy` branch. Major updates are summarized as below:
 
