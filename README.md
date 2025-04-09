@@ -1,34 +1,35 @@
 # DAPS: Improving Diffusion Inverse Problem Solving with Decoupled Noise Annealing (CVPR 2025 Oral)
 
-### [Paper](https://arxiv.org/abs/2407.01521) | [Project Page](https://daps-inverse-problem.github.io/)
+### 📝 [Paper](https://arxiv.org/abs/2407.01521) | 🌐 [Project Page](https://daps-inverse-problem.github.io/)
 
 ![img](README.assets/teaser.png)
 
 
 
-## Abstract
+## 🔥 News:
 
-We propose a new method called Decoupled Annealing Posterior Sampling (DAPS) that relies on a novel noise annealing process to solve posterior sampling with diffusion prior. Specifically, we decouple consecutive steps in a diffusion sampling trajectory, allowing them to vary considerably from one another while ensuring their time-marginals anneal to the true posterior as we reduce noise levels. 
+* 🎉 **April 2025**: DAPS is accepted as **CVPR 2025 Oral** Presentation!
+
+* ⚙️ **March 2025**: Major code restructuring for enhanced modularity:
+
+  * update diffusion schulers in `cores/scheduler.py`.
+  * update MCMC sampler to support different algorithms and approximations in `cores/mcmc.py`.
+  * enhance LatentDAPS with $\texttt{HMC}$ which sustantially improve the performance.
+  * move the previous code structure to `legacy` branch
+
+* 🎉 **Feb 2025**: DAPS has been accepted by **CVPR 2025**! 
+
+  
+
+## 🚀 Introduction
+
+We propose a new method called **Decoupled Annealing Posterior Sampling (DAPS)** that relies on a novel noise annealing process to solve posterior sampling with diffusion prior. Specifically, we decouple consecutive steps in a diffusion sampling trajectory, allowing them to vary considerably from one another while ensuring their time-marginals anneal to the true posterior as we reduce noise levels. 
 
 ![img](README.assets/method.png)
 
 This approach enables the exploration of a larger solution space, improving the success rate for accurate reconstructions. We demonstrate that DAPS significantly improves sample quality and stability across multiple image restoration tasks, particularly in complicated nonlinear inverse problems.
 
 
-
-## 🔥 News:
-
-* **2025-04**: DAPS is accepted as **CVPR 2025 Oral** Presentation 🎉.
-
-* **2025-03:** update code structure and usability to support different MCMC algorithms and various types of diffusion models. The previous code structure has been moved to the `legacy` branch. Major updates are summarized as below:
-
-  1. update diffusion schulers in `cores/scheduler.py`.
-
-  2. update MCMC sampler to support different algorithms and approximations in `cores/mcmc.py`.
-
-  3. enhance LatentDAPS with $\texttt{HMC}$ which sustantially improve the performance.
-
-     
 
 ## 🕹️ Try and Play with DAPS on Colab!
 
@@ -39,7 +40,7 @@ This approach enables the exploration of a larger solution space, improving the 
 
 
 
-## 💻 Getting start locally
+## 💻 Local Setup
 
 ### 1. Prepare the Environment
 
@@ -47,11 +48,11 @@ This approach enables the exploration of a larger solution space, improving the 
 - PyTorch 2.3
 - CUDA 12.1
 
-Lower version of PyTorch with proper CUDA should work but not be fully tested.
+Other version of PyTorch with proper CUDA should work but not be fully tested. 
 
-```
-# in DAPS folder
-
+<details>
+  <summary>commands</summary>
+  # in DAPS folder
 conda create -n DAPS python=3.8
 conda activate DAPS
 
@@ -59,7 +60,7 @@ pip install -r requirements.txt
 
 # (optional) install PyTorch with proper CUDA
 conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=12.1 -c pytorch -c nvidia
-```
+</details>
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
