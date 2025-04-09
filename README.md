@@ -43,7 +43,7 @@ This approach enables the exploration of a larger solution space, improving the 
 ## 💻 Local Setup
 
 <details>
-  <summary><h3>1. Prepare the Environment</h3></summary>
+  <summary><h3 style="display:inline;">1. Prepare the Environment</h3></summary>
 
 
 - python 3.8  
