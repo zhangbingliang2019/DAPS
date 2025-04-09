@@ -1,4 +1,4 @@
-# Improving Diffusion Inverse Problem Solving with Decoupled Noise Annealing (DAPS)<br><sub>Official Implementation of the CVPR 2025 Paper (Oral)</sub>
+# DAPS: Improving Diffusion Inverse Problem Solving with Decoupled Noise Annealing (CVPR 2025 Oral)
 
 ### [Paper](https://arxiv.org/abs/2407.01521)| [Project Page](https://daps-inverse-problem.github.io/) |  
 
