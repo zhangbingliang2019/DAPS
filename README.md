@@ -43,7 +43,8 @@ This approach enables the exploration of a larger solution space, improving the 
 ## 💻 Local Setup
 
 <details>
-<summary><strong>1. Prepare the Environment</strong></summary>
+  <summary><span style="font-size: 1.5em;"><strong>1. Prepare the Environment</strong></span></summary>
+
 
 - python 3.8  
 - PyTorch 2.3  
@@ -64,15 +65,15 @@ conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
-</details>
+<details>
+  <summary><span style="font-size: 1.5em;"><strong>2. Prepare the pretrained checkpoint</strong></span></summary>
 
-### 2. Prepare the pretrained checkpoint
-
-#### 2.1 pixel diffusion model
+<details>
+  <summary><span style="font-size: 1.2em;"><strong>2.1 pixel diffusion model</strong></span></summary>
 
 Download the public available FFHQ and ImageNet checkpoint (ffhq_10m.pt, imagenet256.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
 
-  ```
+  ```bash
 # in DAPS folder
 
 mkdir checkpoints
@@ -107,6 +108,8 @@ Checkpoints will be automatically downloaded.
 
 mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
 ```
+
+</details>
 
 
 
