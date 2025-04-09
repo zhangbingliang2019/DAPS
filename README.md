@@ -16,7 +16,7 @@ This approach enables the exploration of a larger solution space, improving the 
 
 
 
-## News:
+## 🔥 News:
 
 * **2025-04**: DAPS is accepted as **CVPR 2025 Oral** Presentation 🎉.
 
