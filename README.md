@@ -121,6 +121,8 @@ mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
 
 </details>
 
+
+
 ### 3.  (Optional) Prepare the test dataset
 
 You can download the selected test dataset used [here](https://drive.google.com/drive/folders/1RHNif32W0hvB4M75ppG1ypTChy-W3q3Z?usp=sharing), unzip and move to `dataset` folder. Otherwise, you can test on our provided 10 demo images at `dataset\demo-ffhq` and `dataset\demo-imagenet`.
