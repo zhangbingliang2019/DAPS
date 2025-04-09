@@ -42,8 +42,7 @@ This approach enables the exploration of a larger solution space, improving the 
 
 ## 💻 Local Setup
 
-<details>
-  <summary><h3 style="display:inline;">1. Prepare the Environment</h3></summary>
+### 1. Prepare the Environment
 
 
 - python 3.8  
@@ -65,13 +64,11 @@ conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
-<details/>
+### 2. Prepare the pretrained checkpoint
 
 <details>
-  <summary><span style="font-size: 1.5em;"><strong>2. Prepare the pretrained checkpoint</strong></span></summary>
+  <summary><strong><strong>2.1 pixel diffusion model</strong></summary>
 
-<details>
-  <summary><span style="font-size: 1.2em;"><strong>2.1 pixel diffusion model</strong></span></summary>
 
 Download the public available FFHQ and ImageNet checkpoint (ffhq_10m.pt, imagenet256.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
 
@@ -83,11 +80,14 @@ mv {DOWNLOAD_DIR}/ffqh_10m.pt checkpoints/ffhq256.pt
 mv {DOWNLOAD_DIR}/imagenet256.pt.pt checkpoints/imagenet256.pt
   ```
 
-#### 2.2  latent diffusion model (LDM)
+</details>
+
+<details>
+  <summary><strong><strong>2.2 latent diffusion model (LDM)</strong></summary>
 
 Download the public available LDM checkpoint for FFHQ and ImageNet with following commands:
 
-  ```
+  ```bash
 # in DAPS folder
 
 wget https://ommer-lab.com/files/latent-diffusion/ffhq.zip -P ./checkpoints
@@ -99,21 +99,27 @@ wget https://ommer-lab.com/files/latent-diffusion/nitro/cin/model.ckpt -P ./chec
 mv checkpoints/model.ckpt checkpoints/ldm_imagenet256.pt
   ```
 
-#### 2.3 stable diffusion
+</details>
+
+<details>
+  <summary><strong><strong>2.3 stable diffusion</strong></summary>
 
 Checkpoints will be automatically downloaded.
 
-**(Optional)** For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
+</details>
 
-```
+<details>
+  <summary><strong><strong>(Optional) 2.4 nonlinear deblur model</strong></summary>
+
+For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
+
+```bash
 # in DAPS folder
 
 mv {DOWNLOAD_DIR}/GOPRO_wVAE.pth forward_operator/bkse/experiments/pretrained
 ```
 
 </details>
-
-
 
 ### 3.  (Optional) Prepare the test dataset
 
