@@ -52,6 +52,7 @@ Other version of PyTorch with proper CUDA should work but not be fully tested.
 
 <details>
   <summary>commands</summary>
+  ``` python
   # in DAPS folder
 conda create -n DAPS python=3.8
 conda activate DAPS
@@ -60,6 +61,7 @@ pip install -r requirements.txt
 
 # (optional) install PyTorch with proper CUDA
 conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=12.1 -c pytorch -c nvidia
+  ```
 </details>
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
@@ -72,7 +74,7 @@ We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for 
 
 Download the public available FFHQ and ImageNet checkpoint (ffhq_10m.pt, imagenet256.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
 
-```
+  ```
 # in DAPS folder
 
 mkdir checkpoints
