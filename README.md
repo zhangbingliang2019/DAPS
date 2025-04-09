@@ -67,7 +67,7 @@ We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for 
 ### 2. Prepare the pretrained checkpoint
 
 <details>
-  <summary><strong><strong>2.1 pixel diffusion model</strong></summary>
+  <summary><strong>2.1 pixel diffusion model</strong></summary>
 
 
 Download the public available FFHQ and ImageNet checkpoint (ffhq_10m.pt, imagenet256.pt) [here](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh).
@@ -83,7 +83,7 @@ mv {DOWNLOAD_DIR}/imagenet256.pt.pt checkpoints/imagenet256.pt
 </details>
 
 <details>
-  <summary><strong><strong>2.2 latent diffusion model (LDM)</strong></summary>
+  <summary><strong>2.2 latent diffusion model (LDM)</strong></summary>
 
 Download the public available LDM checkpoint for FFHQ and ImageNet with following commands:
 
@@ -102,14 +102,14 @@ mv checkpoints/model.ckpt checkpoints/ldm_imagenet256.pt
 </details>
 
 <details>
-  <summary><strong><strong>2.3 stable diffusion</strong></summary>
+  <summary><strong>2.3 stable diffusion</strong></summary>
 
 Checkpoints will be automatically downloaded.
 
 </details>
 
 <details>
-  <summary><strong><strong>(Optional) 2.4 nonlinear deblur model</strong></summary>
+  <summary><strong>(Optional) 2.4 nonlinear deblur model</strong></summary>
 
 For nonlinear deblur task, we need the pretrained model from [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) at [here](https://drive.google.com/file/d/1vRoDpIsrTRYZKsOMPNbPcMtFDpCT6Foy/view?usp=drive_link):
 
