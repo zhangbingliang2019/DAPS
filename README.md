@@ -140,9 +140,11 @@ It takes about 8 minutes (2 for each run) and 6G GPU memory on a single NVIDIA A
 
 
 
+### 5. Benchmarking and reproduction
+
 #### Full commands on test dataset
 
-Full comands used to reproduce the results in paper are provided in `commands` folder:
+We provide the full comands used to reproduce the results in paper are provided in `commands` folder:
 
 * pixel space diffusion: `commands/pixel.sh`
 * latent diffusion: `commands/ldm.sh`
