@@ -42,18 +42,17 @@ This approach enables the exploration of a larger solution space, improving the 
 
 ## 💻 Local Setup
 
-### 1. Prepare the Environment
-
-- python 3.8
-- PyTorch 2.3
-- CUDA 12.1
-
-Other version of PyTorch with proper CUDA should work but not be fully tested. 
-
 <details>
-  <summary>commands</summary>
-  ``` python
-  # in DAPS folder
+<summary><strong>1. Prepare the Environment</strong></summary>
+
+- python 3.8  
+- PyTorch 2.3  
+- CUDA 12.1  
+
+Other versions of PyTorch with proper CUDA should work but are not fully tested.
+
+```bash
+# in DAPS folder
 conda create -n DAPS python=3.8
 conda activate DAPS
 
@@ -61,12 +60,11 @@ pip install -r requirements.txt
 
 # (optional) install PyTorch with proper CUDA
 conda install pytorch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 pytorch-cuda=12.1 -c pytorch -c nvidia
-  ```
-</details>
+```
 
 We use [bkse](https://github.com/VinAIResearch/blur-kernel-space-exploring) for nonlinear blurring and [motionblur](https://github.com/LeviBorodenko/motionblur) for motion blur. **No further action required then**.
 
-
+</details>
 
 ### 2. Prepare the pretrained checkpoint
 
@@ -80,13 +78,13 @@ Download the public available FFHQ and ImageNet checkpoint (ffhq_10m.pt, imagene
 mkdir checkpoints
 mv {DOWNLOAD_DIR}/ffqh_10m.pt checkpoints/ffhq256.pt
 mv {DOWNLOAD_DIR}/imagenet256.pt.pt checkpoints/imagenet256.pt
-```
+  ```
 
 #### 2.2  latent diffusion model (LDM)
 
 Download the public available LDM checkpoint for FFHQ and ImageNet with following commands:
 
-```
+  ```
 # in DAPS folder
 
 wget https://ommer-lab.com/files/latent-diffusion/ffhq.zip -P ./checkpoints
@@ -96,7 +94,7 @@ rm checkpoints/ffhq.zip
 
 wget https://ommer-lab.com/files/latent-diffusion/nitro/cin/model.ckpt -P ./checkpoints/
 mv checkpoints/model.ckpt checkpoints/ldm_imagenet256.pt
-```
+  ```
 
 #### 2.3 stable diffusion
 
