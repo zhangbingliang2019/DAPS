@@ -35,7 +35,7 @@ This approach enables the exploration of a larger solution space, improving the 
 | Link                                                         | Description                                                |
 | ------------------------------------------------------------ | ---------------------------------------------------------- |
 | [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/DAPS_Demo.ipynb) | Try DAPS on demo datasets with different diffusion models. |
-| [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb) | Customizing DAPS for New Inverse Problems                  |
+| [<img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>](https://colab.research.google.com/github/zhangbingliang2019/DAPS/blob/main/scripts/Customization.ipynb) | Customizing DAPS for new inverse problems.                 |
 
 
 
