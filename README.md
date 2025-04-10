@@ -42,7 +42,7 @@ This approach enables the exploration of a larger solution space, improving the 
 
 ## 💻 Local Setup
 
-### 1. Prepare the Environment
+### 1. Prepare the environment
 
 
 - python 3.8  
