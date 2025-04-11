@@ -220,7 +220,7 @@ Currently supported tasks are:
 
 * `phase_retrieval`: phase retrival of oversample ratio of 2.0
 
-* `down_sampling`: super resolution ($\times$4)
+* `down_sampling`: super resolution (x4)
 
 * `inpainting`:  128x128 box inpainting
 
