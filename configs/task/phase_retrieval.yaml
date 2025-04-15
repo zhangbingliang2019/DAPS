@@ -13,6 +13,22 @@ pixel:
     oversample: 2.0
     sigma: 0.05
 
+# pixel space task with hmc
+pixel_hmc:
+  mcmc_sampler_config:  
+    num_steps: 62
+    lr: 9.75e-6
+    tau: 0.01
+    lr_min_ratio: 0.019
+    momentum: 0.73
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: phase_retrieval
+    oversample: 2.0
+    sigma: 0.05
+
 # latent diffusion model
 ldm: 
   mcmc_sampler_config: 
@@ -32,11 +48,11 @@ ldm:
 # stable diffusion 
 sd: 
   mcmc_sampler_config: 
-    num_steps: 100
-    lr: 7e-5 
+    num_steps: 95
+    lr: 1.10e-4
     tau: 0.01
-    lr_min_ratio: 1
-    momentum: 0.70
+    lr_min_ratio: 0.027
+    momentum: 0.47
     mc_algo: hmc
     prior_solver: gaussian
 

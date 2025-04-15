@@ -15,6 +15,24 @@ pixel:
     resolution: 256
     sigma: 0.05
 
+# pixel space task with hmc
+pixel_hmc:
+  mcmc_sampler_config:  
+    num_steps: 84
+    lr: 1.15e-5
+    tau: 0.01
+    lr_min_ratio: 0.014
+    momentum: 0.003
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: inpainting
+    mask_type: box
+    mask_len_range: [128, 129]
+    resolution: 256
+    sigma: 0.05
+
 # latent diffusion model
 ldm: 
   mcmc_sampler_config: 
@@ -36,11 +54,11 @@ ldm:
 # stable diffusion 
 sd: 
   mcmc_sampler_config: 
-    num_steps: 20
-    lr: 1e-5
+    num_steps: 58
+    lr: 1.11e-6
     tau: 0.01
-    lr_min_ratio: 1
-    momentum: 0.60
+    lr_min_ratio: 0.43
+    momentum: 0.92
     mc_algo: hmc
     prior_solver: gaussian
   

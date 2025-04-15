@@ -14,6 +14,23 @@ pixel:
     intensity: 3.0
     sigma: 0.05
 
+# pixel space task with hmc
+pixel_hmc:
+  mcmc_sampler_config:  
+    num_steps: 82
+    lr: 4.04e-5
+    tau: 0.01
+    lr_min_ratio: 0.011
+    momentum: 0.10
+    mc_algo: hmc
+    prior_solver: gaussian
+  
+  operator:
+    name: gaussian_blur
+    kernel_size: 61
+    intensity: 3.0
+    sigma: 0.05
+
 # latent diffusion model
 ldm: 
   mcmc_sampler_config: 
