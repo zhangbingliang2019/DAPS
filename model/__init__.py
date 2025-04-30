@@ -216,7 +216,6 @@ class StableDiffusionModel(LatentDiffusionModel):
     """
     def __init__(self, model_id = "stabilityai/stable-diffusion-2-1", inner_resolution=768, target_resolution=256, guidance_scale=7.5, prompt='a natural looking human face', device='cuda', hf_home='checkpoints/.cache/huggingface'):
         super().__init__()
-        os.environ["HF_HOME"] = hf_home
         pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
         self.pipe = pipe.to(device)
         self.vae = self.pipe.vae
