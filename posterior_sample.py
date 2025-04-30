@@ -154,7 +154,7 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
                 # save long grid images
                 selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
                 traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx, run))
-                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(idx))
+                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
 
 
 
