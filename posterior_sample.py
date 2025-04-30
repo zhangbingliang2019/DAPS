@@ -145,9 +145,18 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
             x0hat_traj = sde_traj.tensor_data['x0hat']
             x0y_traj = sde_traj.tensor_data['x0y']
             xt_traj = sde_traj.tensor_data['xt']
+            slices = np.linspace(0, len(x0hat_traj)-1, 10).astype(int)
+            slices = np.unique(slices)
             for idx in range(total_number):
-                video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
-                save_mp4_video(images[idx], resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
+                if args.save_traj_video:
+                    video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
+                    save_mp4_video(images[idx], resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
+                # save long grid images
+                selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
+                traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx, run))
+                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(idx))
+
+
 
     # log the evaluation metrics
     with open(str(root / 'eval.md'), 'w') as file:
