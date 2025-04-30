@@ -135,7 +135,7 @@ def log_results(args, sde_trajs, results, images, y, full_samples, table_markdow
     if args.save_traj:
         traj_dir = safe_dir(root / 'trajectory')
         print()
-        print('save trajectories to mp4 videos...')
+        print('save trajectories...')
         for run, sde_traj in enumerate(sde_trajs):
             if args.save_traj_raw_data:
                 # might be SUPER LARGE
