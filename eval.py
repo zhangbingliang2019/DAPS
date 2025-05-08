@@ -76,15 +76,19 @@ class Evaluator:
 
     def display(self, result_dicts):
         table = Table('results')
-        summary = {}
+        average, std = {}, {}
         for key in result_dicts.keys():
             value = ['{:.3f}'.format(v) for v in result_dicts[key][get_eval_fn_cmp(key)]]
             table.add_column(key, value)
-            summary[key] = '{:.3f}'.format(np.mean(result_dicts[key][get_eval_fn_cmp(key)]))
+            average[key] = '{:.3f}'.format(np.mean(result_dicts[key][get_eval_fn_cmp(key)]))
+            std[key] = '{:.3f}'.format(np.std(result_dicts[key][get_eval_fn_cmp(key)]))
         # for average
         table.add_row(['' for _ in result_dicts.keys()])
-        table.add_row(['avg' for _ in result_dicts.keys()])
-        table.add_row(summary.values())
+        table.add_row(['mean' for _ in result_dicts.keys()])
+        table.add_row(average.values())
+        table.add_row(['' for _ in result_dicts.keys()])
+        table.add_row(['std' for _ in result_dicts.keys()])
+        table.add_row(std.values())
 
         return table.get_string()
 

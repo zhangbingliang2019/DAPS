@@ -6,16 +6,19 @@ from forward_operator import get_operator
 from data import get_dataset
 from sampler import get_sampler, Trajectory
 from model import get_model
-from eval import get_eval_fn, Evaluator
+from eval import get_eval_fn, get_eval_fn_cmp, Evaluator
 from torch.nn.functional import interpolate
 from pathlib import Path
 from omegaconf import OmegaConf
+from evaluate_fid import calculate_fid
+from torch.utils.data import DataLoader
 import hydra
 import wandb
 import setproctitle
 from PIL import Image
 import numpy as np
 import imageio
+
 import os
 
 
@@ -106,65 +109,7 @@ def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, se
     writer.close()
 
 
-def log_results(args, sde_trajs, results, images, y, full_samples, table_markdown, total_number):
-    # log hyperparameters and configurations
-    full_samples = full_samples.flatten(0, 1)
-    os.makedirs(args.save_dir, exist_ok=True)
-    save_dir = safe_dir(Path(args.save_dir))
-    root = safe_dir(save_dir / args.name)
-    with open(str(root / 'config.yaml'), 'w') as file:
-        yaml.safe_dump(OmegaConf.to_container(args, resolve=True), file, default_flow_style=False, allow_unicode=True)
-
-    # log grid results
-    resized_y = resize(y, images, args.task[args.task_group].operator.name)
-    stack = torch.cat([images, resized_y, full_samples])
-    save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
-
-    # log individual sample instances
-    if args.save_samples:
-        pil_image_list = tensor_to_pils(full_samples)
-        image_dir = safe_dir(root / 'samples')
-        cnt = 0
-        for run in range(args.num_runs):
-            for idx in range(total_number):
-                image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx, run)
-                pil_image_list[cnt].save(str(image_path))
-                cnt += 1
-
-    # log sampling trajectory and mp4 video
-    if args.save_traj:
-        traj_dir = safe_dir(root / 'trajectory')
-        print()
-        print('save trajectories...')
-        for run, sde_traj in enumerate(sde_trajs):
-            if args.save_traj_raw_data:
-                # might be SUPER LARGE
-                traj_raw_data = safe_dir(traj_dir / 'raw')
-                torch.save(sde_traj, str(traj_raw_data / 'trajectory_run{:04d}.pth'.format(run)))
-            # save mp4 video for trajectories
-            x0hat_traj = sde_traj.tensor_data['x0hat']
-            x0y_traj = sde_traj.tensor_data['x0y']
-            xt_traj = sde_traj.tensor_data['xt']
-            slices = np.linspace(0, len(x0hat_traj)-1, 10).astype(int)
-            slices = np.unique(slices)
-            for idx in range(total_number):
-                if args.save_traj_video:
-                    video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx, run))
-                    save_mp4_video(images[idx], resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
-                # save long grid images
-                selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
-                traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx, run))
-                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
-
-
-
-    # log the evaluation metrics
-    with open(str(root / 'eval.md'), 'w') as file:
-        file.write(table_markdown)
-    json.dump(results, open(str(root / 'metrics.json'), 'w'), indent=4)
-
-
-def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt):
+def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt, args, root, run_id):
     """
         posterior sampling in batch
     """
@@ -179,7 +124,36 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
 
         samples.append(cur_samples)
         if record:
-            trajs.append(sampler.trajectory.compile())
+            cur_trajs = sampler.trajectory.compile()
+            trajs.append(cur_trajs)
+
+        # log individual sample instances
+        if args.save_samples:
+            pil_image_list = tensor_to_pils(cur_samples)
+            image_dir = safe_dir(root / 'samples')
+            for idx in range(batch_size):
+                image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id)
+                pil_image_list[idx].save(str(image_path))
+
+        # log sampling trajectory and mp4 video
+        if args.save_traj:
+            traj_dir = safe_dir(root / 'trajectory')
+            # save mp4 video for trajectories
+            x0hat_traj = cur_trajs.tensor_data['x0hat']
+            x0y_traj = cur_trajs.tensor_data['x0y']
+            xt_traj = cur_trajs.tensor_data['xt']
+            cur_resized_y = resize(cur_y, cur_samples, args.task[args.task_group].operator.name)
+            slices = np.linspace(0, len(x0hat_traj)-1, 10).astype(int)
+            slices = np.unique(slices)
+            for idx in range(batch_size):
+                if args.save_traj_video:
+                    video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx+s, run_id))
+                    save_mp4_video(cur_samples[idx], cur_resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
+                # save long grid images
+                selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
+                traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id))
+                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
+        
     if record:
         trajs = Trajectory.merge(trajs)
     return torch.cat(samples, dim=0), trajs
@@ -190,18 +164,17 @@ def main(args):
     # fix random seed
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.cuda.set_device('cuda:{}'.format(args.gpu))
 
     setproctitle.setproctitle(args.name)
-    print(args)
+    print(yaml.dump(OmegaConf.to_container(args, resolve=True), indent=4))
 
     # get data
-    data = get_dataset(**args.data)
-    total_number = len(data)
-    images = data.get_data(total_number, 0)
+    dataset = get_dataset(**args.data)
+    total_number = len(dataset)
+    images = dataset.get_data(total_number, 0)
 
     # get operator & measurement
     task_group = args.task[args.task_group]
@@ -220,6 +193,21 @@ def main(args):
         eval_fn_list.append(get_eval_fn(eval_fn_name))
     evaluator = Evaluator(eval_fn_list)
 
+    # log hyperparameters and configurations
+    os.makedirs(args.save_dir, exist_ok=True)
+    save_dir = safe_dir(Path(args.save_dir))
+    root = safe_dir(save_dir / args.name)
+    with open(str(root / 'config.yaml'), 'w') as file:
+        yaml.safe_dump(OmegaConf.to_container(args, resolve=True), file, default_flow_style=False, allow_unicode=True)
+
+    # logging to wandb
+    if args.wandb:
+        wandb.init(
+            project=args.project_name,
+            name=args.name,
+            config=OmegaConf.to_container(args, resolve=True)
+        )
+
     # +++++++++++++++++++++++++++++++++++
     # main sampling process
     full_samples = []
@@ -227,26 +215,67 @@ def main(args):
     for r in range(args.num_runs):
         print(f'Run: {r}')
         x_start = sampler.get_start(images.shape[0], model)
-        samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True,
-                                         record=args.save_traj, batch_size=args.batch_size, gt=images)
+        samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True, record=args.save_traj, 
+                                         batch_size=args.batch_size, gt=images, args=args, root=root, run_id=r)
         full_samples.append(samples)
         full_trajs.append(trajs)
     full_samples = torch.stack(full_samples, dim=0)
 
-    # log metrics
-    results = evaluator.report(images, y, full_samples)
+    # evaluate and log metrics
+    results = evaluator.report(images, y, full_samples)    
+    if args.wandb:
+        evaluator.log_wandb(results, args.batch_size)
     markdown_text = evaluator.display(results)
+    with open(str(root / 'eval.md'), 'w') as file:
+        file.write(markdown_text)
+    json.dump(results, open(str(root / 'metrics.json'), 'w'), indent=4)
     print(markdown_text)
 
-    # log results
-    log_results(args, full_trajs, results, images, y, full_samples, markdown_text, total_number)
-    if args.wandb:
-        wandb.init(
-            project=args.project_name,
-            name=args.name,
-            config=OmegaConf.to_container(args, resolve=True)
-        )
-        evaluator.log_wandb(results, args.batch_size)
+    # log grid results
+    resized_y = resize(y, images, args.task[args.task_group].operator.name)
+    stack = torch.cat([images, resized_y, full_samples.flatten(0, 1)])
+    save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
+    
+    # save raw trajectory data
+    if args.save_traj_raw_data:
+        traj_dir = safe_dir(root / 'trajectory')
+        for run, sde_traj in enumerate(full_trajs):
+            # might be SUPER LARGE
+            print(f'saving trajectory run {run}...')
+            traj_raw_data = safe_dir(traj_dir / 'raw')
+            torch.save(sde_traj, str(traj_raw_data / 'trajectory_run{:04d}.pth'.format(run)))
+    
+    # evaluate FID score
+    if args.eval_fid:
+        print('Calculating FID...')
+        fid_dir = safe_dir(root / 'fid')
+        # select the best samples based on the best of the all runs
+        full_samples # [num_runs, B, C, H, W]
+        eval_fn_cmp = get_eval_fn_cmp(evaluator.main_eval_fn_name)
+        eval_values = np.array(results[evaluator.main_eval_fn_name]['sample']) # [B, num_runs]
+        if eval_fn_cmp == 'min':
+            best_idx = np.argmin(eval_values, axis=1)
+        elif eval_fn_cmp == 'max':
+            best_idx = np.argmax(eval_values, axis=1)
+        best_samples = full_samples[best_idx, np.arange(full_samples.shape[1])]
+        # save the best samples
+        best_sample_dir = safe_dir(fid_dir / 'best_sample')
+        pil_image_list = tensor_to_pils(best_samples)
+        for idx in range(len(pil_image_list)):
+            image_path = best_sample_dir / '{:05d}.png'.format(idx)
+            pil_image_list[idx].save(str(image_path))
+
+        fake_dataset = get_dataset(args.data.name, resolution=args.data.resolution, root=str(best_sample_dir))
+        real_loader = DataLoader(dataset, batch_size=100, shuffle=False)
+        fake_loader = DataLoader(fake_dataset, batch_size=100, shuffle=False)
+
+        fid_score = calculate_fid(real_loader, fake_loader)
+        print(f'FID Score: {fid_score.item():.4f}')
+        with open(str(fid_dir / 'fid.txt'), 'w') as file:
+            file.write(f'FID Score: {fid_score.item():.4f}')
+        if args.wandb:
+            wandb.log({'FID': fid_score.item()})
+
     print(f'finish {args.name}!')
 
 

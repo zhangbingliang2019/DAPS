@@ -43,13 +43,14 @@ def calculate_fid(real_loader, generated_loader, device='cuda'):
     score = fid.compute_metric(real_features, gen_features)
     return score
 
-# ++++++++++++++++++++++++++++++++++++++
-# Please change the path to your dataset
-real_dataset = ImageDataset(root='dataset/test-ffhq', resolution=256, start_id=0, end_id=100)
-fake_dataset = ImageDataset(root='results/pixel/ffhq/inpainting/samples', resolution=256, start_id=0, end_id=100)
+if __name__ == '__main__':
+    # ++++++++++++++++++++++++++++++++++++++
+    # Please change the path to your dataset
+    real_dataset = ImageDataset(root='dataset/test-ffhq', resolution=256, start_id=0, end_id=100)
+    fake_dataset = ImageDataset(root='results/pixel/ffhq/inpainting/samples', resolution=256, start_id=0, end_id=100)
 
-real_loader = DataLoader(real_dataset, batch_size=100, shuffle=False)
-fake_loader = DataLoader(fake_dataset, batch_size=100, shuffle=False)
+    real_loader = DataLoader(real_dataset, batch_size=100, shuffle=False)
+    fake_loader = DataLoader(fake_dataset, batch_size=100, shuffle=False)
 
-fid_score = calculate_fid(real_loader, fake_loader)
-print(f'FID Score: {fid_score.item():.4f}')
+    fid_score = calculate_fid(real_loader, fake_loader)
+    print(f'FID Score: {fid_score.item():.4f}')
