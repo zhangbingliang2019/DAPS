@@ -50,7 +50,7 @@ torchdiffeq==0.2.5
 diffusers==0.32.2
 huggingface-hub==0.29.3
 importlib-metadata==8.5.0
-regex-2024==11.6
+regex==2024.11.6
 safetensors==0.5.3
 zipp==3.20.2
 tokenizers==0.20.3
