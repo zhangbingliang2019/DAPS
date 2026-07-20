@@ -20,6 +20,7 @@ import numpy as np
 import imageio
 
 import os
+import gc
 
 
 def resize(y, x, task_name):
@@ -109,7 +110,8 @@ def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, se
     writer.close()
 
 
-def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt, args, root, run_id):
+def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt, args, root, run_id
+                    ,keep_traj=False):
     """
         posterior sampling in batch
     """
@@ -123,21 +125,25 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
         cur_gt = gt[s: e]
         cur_samples = sampler.sample(model, cur_x_start, operator, cur_y, evaluator, verbose=verbose, record=record, gt=cur_gt)
 
+        cur_samples_cpu = cur_samples.detach().cpu()
         samples.append(cur_samples)
+        
+        cur_trajs = None
         if record:
             cur_trajs = sampler.trajectory.compile()
-            trajs.append(cur_trajs)
+            if keep_traj:
+                trajs.append(cur_trajs)
 
         # log individual sample instances
         if args.save_samples:
-            pil_image_list = tensor_to_pils(cur_samples)
+            pil_image_list = tensor_to_pils(cur_samples_cpu)
             image_dir = safe_dir(root / 'samples')
             for idx in range(e-s):
                 image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id)
                 pil_image_list[idx].save(str(image_path))
 
         # log sampling trajectory and mp4 video
-        if args.save_traj:
+        if args.save_traj and cur_trajs is not None:
             traj_dir = safe_dir(root / 'trajectory')
             # save mp4 video for trajectories
             x0hat_traj = cur_trajs.tensor_data['x0hat']
@@ -154,9 +160,21 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
                 selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
                 traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id))
                 save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
+                del selected_traj_grid
+        del cur_samples
+        del cur_samples_cpu
+        del cur_x_start
+        del cur_y
+        del cur_gt
+        del cur_trajs
         
-    if record:
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+    if keep_traj:
         trajs = Trajectory.merge(trajs)
+    else:
+        trajs = None
     return torch.cat(samples, dim=0), trajs
 
 
@@ -216,10 +234,17 @@ def main(args):
     for r in range(args.num_runs):
         print(f'Run: {r}')
         x_start = sampler.get_start(images.shape[0], model)
-        samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True, record=args.save_traj, 
-                                         batch_size=args.batch_size, gt=images, args=args, root=root, run_id=r)
+        samples, trajs = sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose=True, record=args.save_traj or args.save_traj_raw_data, 
+                                         batch_size=args.batch_size, gt=images, args=args, root=root, run_id=r, keep_traj = args.save_traj_raw_data)
         full_samples.append(samples)
-        full_trajs.append(trajs)
+        if args.save_traj_raw_data:
+            full_trajs.append(trajs)
+        del x_start
+        del samples
+        del trajs
+        
+        gc.collect()
+        torch.cuda.empty_cache()
     full_samples = torch.stack(full_samples, dim=0)
 
     # evaluate and log metrics
